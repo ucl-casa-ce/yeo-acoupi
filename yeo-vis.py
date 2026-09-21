@@ -1159,13 +1159,17 @@ with tab_heatmap:
     * 🔴 **Red (Offline / Silent)**: No transmissions recorded during that elapsed hour.
     """)
 
-    # Consolidate all activity events (Heartbeats + Detections)
+    # Consolidate all activity events (Full Heartbeats + All Raw Detections)
+    # This captures ANY transmission received by InfluxDB, regardless of confidence or taxa filters
     activity_frames = []
     if not hb_df.empty and "_time" in hb_df.columns and "Device" in hb_df.columns:
         valid_hb = hb_df.dropna(subset=["_time", "Device"])[["_time", "Device"]].rename(columns={"_time": "Time"})
         activity_frames.append(valid_hb)
-    if not df.empty and "Time" in df.columns and "Device" in df.columns:
-        valid_det = df.dropna(subset=["Time", "Device"])[["Time", "Device"]]
+    if not raw_df.empty and ("_time" in raw_df.columns or "Time" in raw_df.columns):
+        raw_act = raw_df.copy()
+        raw_act["Time"] = pd.to_datetime(raw_act["_time"] if "_time" in raw_act.columns else raw_act["Time"], utc=True)
+        raw_act["Device"] = raw_act.apply(resolve_device_id, axis=1)
+        valid_det = raw_act.dropna(subset=["Time", "Device"])[["Time", "Device"]]
         activity_frames.append(valid_det)
 
     if activity_frames:
@@ -1222,7 +1226,12 @@ with tab_heatmap:
 
         for dev_id in devices_to_render:
             friendly_name = deployments[dev_id]["name"] if dev_id in deployments and deployments[dev_id].get("name") else dev_id
-            disp_title = f"{friendly_name} ({dev_id})" if friendly_name != dev_id else dev_id
+            
+            # Format header with backticks around MAC/dev_id to prevent Streamlit interpreting ':cd:' as an emoji
+            if friendly_name != dev_id:
+                disp_header = f"#### {friendly_name} (`{dev_id}`)"
+            else:
+                disp_header = f"#### `{dev_id}`"
 
             dev_act = combined_act[combined_act["Device"] == dev_id]
             if not dev_act.empty:
@@ -1262,7 +1271,7 @@ with tab_heatmap:
 
             uptime_pct = (online_hours / elapsed_hours * 100.0) if elapsed_hours > 0 else 0.0
 
-            st.markdown(f"#### 📡 {disp_title}")
+            st.markdown(disp_header)
             sc1, sc2, sc3 = st.columns([1.5, 1.5, 3])
             sc1.metric("Operational Uptime", f"{uptime_pct:.1f}%")
             sc2.metric("Active Hours", f"{online_hours} / {elapsed_hours} hrs")
