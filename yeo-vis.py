@@ -477,10 +477,10 @@ else:
 
 # --- HEARTBEAT & SYSTEM TELEMETRY QUERY ---
 @st.cache_data(ttl=60)
-def fetch_heartbeat_data():
+def fetch_heartbeat_data(time_val="-7d"):
     hb_query = f'''
     from(bucket: "{BUCKET}")
-      |> range(start: -24h)
+      |> range(start: {time_val})
       |> filter(fn: (r) => r["_measurement"] == "acoupi_heartbeat")
       |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
     '''
@@ -494,7 +494,7 @@ def fetch_heartbeat_data():
 
 hb_df = pd.DataFrame()
 if page != "Info + Map":
-    hb_df = fetch_heartbeat_data()
+    hb_df = fetch_heartbeat_data(selected_time_val)
 
 # Process Heartbeat Data
 active_devices_count = 0
@@ -533,9 +533,9 @@ if page != "Info + Map" and not hb_df.empty:
             hb_df["mem_used"] = hb_df["mem_used"].fillna(hb_df["t"])
         
         if "_time" in hb_df.columns:
-            hb_df["_time"] = pd.to_datetime(hb_df["_time"])
-            latest_hb = hb_df.sort_values("_time", ascending=False).groupby("Device").first().reset_index()
+            hb_df["_time"] = pd.to_datetime(hb_df["_time"], utc=True)
             now_utc = pd.Timestamp.now(tz="UTC")
+            hb_24h = hb_df[hb_df["_time"] >= (now_utc - pd.Timedelta(hours=24))]
             
             st.sidebar.markdown("### Device Status (24h)")
             
@@ -545,37 +545,41 @@ if page != "Info + Map" and not hb_df.empty:
                     return deployments[dev_id]["name"]
                 return dev_id
 
-            hb_rows = latest_hb.to_dict("records")
-            hb_rows.sort(key=lambda r: natural_sort_key(get_friendly_name(r.get("Device", ""))))
+            if not hb_24h.empty:
+                latest_hb = hb_24h.sort_values("_time", ascending=False).groupby("Device").first().reset_index()
+                hb_rows = latest_hb.to_dict("records")
+                hb_rows.sort(key=lambda r: natural_sort_key(get_friendly_name(r.get("Device", ""))))
 
-            for dev_row in hb_rows:
-                dev_id = dev_row["Device"]
-                friendly_name = get_friendly_name(dev_id)
-                last_seen = dev_row["_time"]
-                diff_hours = (now_utc - last_seen).total_seconds() / 3600.0
-                
-                if diff_hours <= 2:
-                    status_icon = "🟢"
-                    status_text = "Online"
-                elif diff_hours <= 12:
-                    status_icon = "🟡"
-                    status_text = "Stale"
-                else:
-                    status_icon = "🔴"
-                    status_text = "Offline"
+                for dev_row in hb_rows:
+                    dev_id = dev_row["Device"]
+                    friendly_name = get_friendly_name(dev_id)
+                    last_seen = dev_row["_time"]
+                    diff_hours = (now_utc - last_seen).total_seconds() / 3600.0
                     
-                time_str = last_seen.strftime("%H:%M:%S (%d %b)")
-                st.sidebar.markdown(f"**{status_icon} `{friendly_name}`**: {status_text}  \n<small>Last: {time_str}</small>", unsafe_allow_html=True)
-                active_devices_count += 1
-                
-            spark_df = hb_df.set_index("_time").resample("1h").size().reset_index(name="Pulses")
-            st.sidebar.markdown("**Heartbeats / Hour**")
-            st.sidebar.line_chart(spark_df, x="_time", y="Pulses", height=130)
+                    if diff_hours <= 2:
+                        status_icon = "🟢"
+                        status_text = "Online"
+                    elif diff_hours <= 12:
+                        status_icon = "🟡"
+                        status_text = "Stale"
+                    else:
+                        status_icon = "🔴"
+                        status_text = "Offline"
+                        
+                    time_str = last_seen.strftime("%H:%M:%S (%d %b)")
+                    st.sidebar.markdown(f"**{status_icon} `{friendly_name}`**: {status_text}  \n<small>Last: {time_str}</small>", unsafe_allow_html=True)
+                    active_devices_count += 1
+                    
+                spark_df = hb_24h.set_index("_time").resample("1h").size().reset_index(name="Pulses")
+                st.sidebar.markdown("**Heartbeats / Hour**")
+                st.sidebar.line_chart(spark_df, x="_time", y="Pulses", height=130)
+            else:
+                st.sidebar.info("No heartbeat data in the last 24h")
     else:
-        st.sidebar.warning("No heartbeat data in the last 24h")
+        st.sidebar.warning("No heartbeat data in the selected period")
 else:
     if page != "Info + Map":
-        st.sidebar.warning("No heartbeat data in the last 24h")
+        st.sidebar.warning("No heartbeat data in the selected period")
 
 # --- DETECTIONS QUERY ---
 @st.cache_data(ttl=60)
@@ -1022,8 +1026,14 @@ else:
 
     st.divider()
 
-# --- RECENT DETECTIONS & TELEMETRY TABS ---
-tab_recent, tab_telemetry, tab_map, tab_species_ref = st.tabs(["🕒 Recent Detections Feed", "📊 Hardware & System Telemetry", "📍 Map View", "📖 Species Reference List"])
+# --- RECENT DETECTIONS, TELEMETRY & HEATMAP TABS ---
+tab_recent, tab_telemetry, tab_heatmap, tab_map, tab_species_ref = st.tabs([
+    "🕒 Recent Detections Feed",
+    "📊 Hardware & System Telemetry",
+    "🗓️ Operational Activity Heatmaps",
+    "📍 Map View",
+    "📖 Species Reference List"
+])
 
 with tab_recent:
     st.subheader("Latest Recorded Detections")
@@ -1140,6 +1150,156 @@ with tab_telemetry:
             st.info("No numerical telemetry (CPU/Memory/SHM) reported in current window.")
     else:
         st.info("Telemetry data (CPU/RAM/SHM) is available when cellular nodes report heartbeats.")
+
+with tab_heatmap:
+    st.subheader("🗓️ Device Operational Activity Heatmaps (24h Diurnal Grid)")
+    st.markdown("""
+    This view maps hourly reporting activity across each calendar day to reveal operational patterns (e.g. duty cycles, battery/solar schedules, or cellular transmission windows).
+    * 🟢 **Green (Online / Reporting)**: The device successfully transmitted at least one telemetry or detection payload in that UTC hour.
+    * 🔴 **Red (Offline / Silent)**: No transmissions recorded during that elapsed hour.
+    """)
+
+    # Consolidate all activity events (Heartbeats + Detections)
+    activity_frames = []
+    if not hb_df.empty and "_time" in hb_df.columns and "Device" in hb_df.columns:
+        valid_hb = hb_df.dropna(subset=["_time", "Device"])[["_time", "Device"]].rename(columns={"_time": "Time"})
+        activity_frames.append(valid_hb)
+    if not df.empty and "Time" in df.columns and "Device" in df.columns:
+        valid_det = df.dropna(subset=["Time", "Device"])[["Time", "Device"]]
+        activity_frames.append(valid_det)
+
+    if activity_frames:
+        combined_act = pd.concat(activity_frames, ignore_index=True)
+        combined_act["Time"] = pd.to_datetime(combined_act["Time"], utc=True)
+    else:
+        combined_act = pd.DataFrame(columns=["Time", "Device"])
+
+    # Determine date range based on selected time window
+    time_days_map = {
+        "-24h": 1,
+        "-2d": 2,
+        "-7d": 7,
+        "-14d": 14,
+        "-30d": 30
+    }
+    num_days = time_days_map.get(selected_time_val, 7)
+    now_utc = pd.Timestamp.now(tz="UTC")
+    end_date = now_utc.date()
+    start_date = (now_utc - pd.Timedelta(days=num_days - 1)).date()
+
+    date_list = [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)]
+    date_labels = [d.strftime("%a %d %b") for d in date_list]
+    hour_labels = [f"{h:02d}:00" for h in range(24)]
+
+    # Determine list of devices to render
+    if selected_device != "All Devices":
+        devices_to_render = [selected_device]
+    else:
+        devices_to_render = sorted(
+            active_devices,
+            key=lambda d: natural_sort_key(deployments[d]["name"] if d in deployments and deployments[d].get("name") else d)
+        )
+
+    if not devices_to_render:
+        st.info("No active devices found in the current view.")
+    else:
+        if len(devices_to_render) > 1:
+            disp_names_map = {d: f"{deployments[d]['name']} ({d})" if d in deployments and deployments[d].get("name") else d for d in devices_to_render}
+            hm_mode = st.radio(
+                "Heatmap Display Mode:",
+                ["Show All Active Devices", "Select Specific Device"],
+                horizontal=True,
+                key="hm_display_mode_key"
+            )
+            if hm_mode == "Select Specific Device":
+                selected_hm_disp = st.selectbox(
+                    "Choose device for heatmap:",
+                    options=[disp_names_map[d] for d in devices_to_render],
+                    key="hm_device_select_key"
+                )
+                inv_map = {v: k for k, v in disp_names_map.items()}
+                devices_to_render = [inv_map.get(selected_hm_disp, selected_hm_disp)]
+
+        for dev_id in devices_to_render:
+            friendly_name = deployments[dev_id]["name"] if dev_id in deployments and deployments[dev_id].get("name") else dev_id
+            disp_title = f"{friendly_name} ({dev_id})" if friendly_name != dev_id else dev_id
+
+            dev_act = combined_act[combined_act["Device"] == dev_id]
+            if not dev_act.empty:
+                dev_act_copy = dev_act.copy()
+                dev_act_copy["Date"] = dev_act_copy["Time"].dt.date
+                dev_act_copy["Hour"] = dev_act_copy["Time"].dt.hour
+                counts_map = dev_act_copy.groupby(["Date", "Hour"]).size()
+            else:
+                counts_map = pd.Series(dtype="int64")
+
+            z_matrix = []
+            text_matrix = []
+            elapsed_hours = 0
+            online_hours = 0
+
+            for h in range(24):
+                z_row = []
+                text_row = []
+                for d in date_list:
+                    # Check if this cell is in the future
+                    is_future = (d > end_date) or (d == end_date and h > now_utc.hour)
+                    if is_future:
+                        z_row.append(None)
+                        text_row.append(f"Future ({d.strftime('%a %d %b')}, {h:02d}:00 UTC)<br>Not yet elapsed")
+                    else:
+                        elapsed_hours += 1
+                        msg_count = counts_map.get((d, h), 0)
+                        if msg_count > 0:
+                            online_hours += 1
+                            z_row.append(1)
+                            text_row.append(f"🟢 <b>Online</b><br>{d.strftime('%a %d %b %Y')} @ {h:02d}:00 UTC<br>{msg_count} payload(s) received")
+                        else:
+                            z_row.append(0)
+                            text_row.append(f"🔴 <b>Offline</b><br>{d.strftime('%a %d %b %Y')} @ {h:02d}:00 UTC<br>No transmissions received")
+                z_matrix.append(z_row)
+                text_matrix.append(text_row)
+
+            uptime_pct = (online_hours / elapsed_hours * 100.0) if elapsed_hours > 0 else 0.0
+
+            st.markdown(f"#### 📡 {disp_title}")
+            sc1, sc2, sc3 = st.columns([1.5, 1.5, 3])
+            sc1.metric("Operational Uptime", f"{uptime_pct:.1f}%")
+            sc2.metric("Active Hours", f"{online_hours} / {elapsed_hours} hrs")
+            with sc3:
+                st.caption(f"Status: **{online_hours}** hours active out of **{elapsed_hours}** elapsed hours in selected {num_days}-day window.")
+
+            fig_hm = go.Figure(
+                data=go.Heatmap(
+                    z=z_matrix,
+                    x=date_labels,
+                    y=hour_labels,
+                    colorscale=[
+                        [0.0, "#e03131"],   # Red for Offline (0)
+                        [0.5, "#e03131"],
+                        [0.5, "#2f9e44"],   # Green for Online (1)
+                        [1.0, "#2f9e44"]
+                    ],
+                    zmin=0,
+                    zmax=1,
+                    xgap=3,
+                    ygap=2,
+                    showscale=False,
+                    text=text_matrix,
+                    hoverinfo="text"
+                )
+            )
+
+            fig_hm.update_layout(
+                xaxis=dict(title="Calendar Date", type="category", tickangle=-30),
+                yaxis=dict(title="Hour of Day (00:00 – 23:00 UTC)", dtick=1, autorange="reversed"),
+                margin=dict(l=50, r=20, t=10, b=40),
+                height=380,
+                template="plotly_white"
+            )
+
+            st.plotly_chart(fig_hm, use_container_width=True)
+            st.divider()
 
 with tab_map:
     st.subheader("Active Node Locations")
