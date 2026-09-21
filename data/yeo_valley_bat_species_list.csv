@@ -2,14 +2,14 @@ species_id,class_name,common_name,species
 0,barbar,Barbastelle,Barbastella barbastellus
 1,cneser,Serotine,Cnephaeus serotinus
 2,myoalc,Alcathoe bat,Myotis alcathoe
-3,myobec,Bechstein’s bat,Myotis bechsteinii
-4,myobra,Brandt’s bat,Myotis brandtii
-5,myodau,Daubenton’s bat,Myotis daubentonii
+3,myobec,Bechstein's bat,Myotis bechsteinii
+4,myobra,Brandt's bat,Myotis brandtii
+5,myodau,Daubenton's bat,Myotis daubentonii
 6,myomys,Whiskered bat,Myotis mystacinus
-7,myonat,Natterer’s bat,Myotis nattereri
-8,nyclei,Lesser noctule,Nyctalus leisleri
-9,nycnoc,Common noctule,Nyctalus noctula
-10,pipnat,Nathusius’ pipistrelle,Pipistrellus nathusii
+7,myonat,Natterer's bat,Myotis nattereri
+8,nyclei,Leisler's bat,Nyctalus leisleri
+9,nycnoc,Noctule,Nyctalus noctula
+10,pipnat,Nathusius' pipistrelle,Pipistrellus nathusii
 11,pippip,Common pipistrelle,Pipistrellus pipistrellus
 12,pippyg,Soprano pipistrelle,Pipistrellus pygmaeus
 13,pleaur,Brown long-eared bat,Plecotus auritus
