@@ -1,4 +1,5 @@
 import os
+import re
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -12,6 +13,10 @@ from datetime import datetime, timedelta
 import warnings
 
 warnings.simplefilter("ignore")
+
+def natural_sort_key(s):
+    """Sort strings with embedded numbers naturally (e.g. unoq-2 before unoq-10)."""
+    return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', str(s))]
 
 # --- DEPLOYED DEVICES SPECIFICATION ---
 DEPLOYED_NAMES = {"UNOQ-10-YV", "UNOQ-11-YV", "UNOQ-12-YV"}
@@ -353,7 +358,7 @@ def fetch_known_devices():
         if d.lower() not in ("nan", "none", "null", "unknown", ""):
             cleaned.append(d)
     if cleaned:
-        return sorted(cleaned)
+        return sorted(cleaned, key=natural_sort_key)
     return ["uno4-cellular", "unoq-2", "unoq-4-cellular", "unoq-bat"]
 
 known_devices = fetch_known_devices()
@@ -363,7 +368,7 @@ deployments = fetch_device_deployments()
 for d in deployments.keys():
     if d not in known_devices and d.lower() not in ("nan", "none", "null", "unknown", ""):
         known_devices.append(d)
-known_devices = sorted(list(set(known_devices)))
+known_devices = sorted(list(set(known_devices)), key=natural_sort_key)
 
 # --- SIDEBAR NAVIGATION ---
 st.sidebar.markdown("## Devices")
@@ -397,7 +402,12 @@ if page != "Info + Map":
         device_display_options[dev_id] = disp_name
         display_to_id[disp_name] = dev_id
 
-    device_options = ["All Devices"] + [device_display_options[d] for d in active_devices if d in device_display_options]
+    # Sort active devices naturally by friendly display name (alphabetical + numerical)
+    sorted_display_names = sorted(
+        [device_display_options[d] for d in active_devices if d in device_display_options],
+        key=natural_sort_key
+    )
+    device_options = ["All Devices"] + sorted_display_names
 
     # Retain previously selected display or default
     current_device_selection = st.session_state.get("device_select_key", "All Devices")
@@ -528,12 +538,19 @@ if page != "Info + Map" and not hb_df.empty:
             now_utc = pd.Timestamp.now(tz="UTC")
             
             st.sidebar.markdown("### Device Status (24h)")
-            for _, dev_row in latest_hb.iterrows():
+            
+            # Helper to get friendly name for sorting and display
+            def get_friendly_name(dev_id):
+                if dev_id in deployments and deployments[dev_id].get("name"):
+                    return deployments[dev_id]["name"]
+                return dev_id
+
+            hb_rows = latest_hb.to_dict("records")
+            hb_rows.sort(key=lambda r: natural_sort_key(get_friendly_name(r.get("Device", ""))))
+
+            for dev_row in hb_rows:
                 dev_id = dev_row["Device"]
-                friendly_name = dev_id
-                if dev_id in deployments and deployments[dev_id]["name"]:
-                    friendly_name = deployments[dev_id]["name"]
-                    
+                friendly_name = get_friendly_name(dev_id)
                 last_seen = dev_row["_time"]
                 diff_hours = (now_utc - last_seen).total_seconds() / 3600.0
                 
@@ -726,6 +743,7 @@ if page == "Info + Map":
                 })
 
     if loc_data:
+        loc_data.sort(key=lambda x: natural_sort_key(x["Device Name"]))
         st.markdown("### Deployed Device Locations")
         loc_df = pd.DataFrame(loc_data)
         render_sensor_map(loc_df, key_suffix="info_map")
@@ -1054,48 +1072,69 @@ with tab_telemetry:
                 if not specific_tel.empty:
                     tel_plot_df = specific_tel
             
-            tel_col1, tel_col2 = st.columns(2)
+            # Reusable legend and layout settings for full-width telemetry charts
+            tel_legend_layout = dict(
+                orientation="h",
+                yanchor="top",
+                y=-0.22,
+                xanchor="center",
+                x=0.5,
+                title=None
+            )
             
-            with tel_col1:
-                if "cpu" in tel_plot_df.columns:
-                    fig_cpu = px.line(
-                        tel_plot_df,
-                        x="_time",
-                        y="cpu",
-                        color="Device_Friendly",
-                        title="CPU Utilization (%)",
-                        template="plotly_white",
-                        labels={"_time": "Time", "cpu": "CPU %", "Device_Friendly": "Device"}
-                    )
-                    fig_cpu.update_layout(margin=dict(l=0, r=0, t=40, b=10))
-                    st.plotly_chart(fig_cpu, use_container_width=True)
-                    
-            with tel_col2:
-                if "mem_free" in tel_plot_df.columns:
-                    fig_mem = px.line(
-                        tel_plot_df,
-                        x="_time",
-                        y="mem_free",
-                        color="Device_Friendly",
-                        title="Free Memory (MB)",
-                        template="plotly_white",
-                        labels={"_time": "Time", "mem_free": "RAM Free (MB)", "Device_Friendly": "Device"}
-                    )
-                    fig_mem.update_layout(margin=dict(l=0, r=0, t=40, b=10))
-                    fig_mem.update_yaxes(rangemode="tozero")
-                    st.plotly_chart(fig_mem, use_container_width=True)
-                    
+            if "cpu" in tel_plot_df.columns:
+                fig_cpu = px.line(
+                    tel_plot_df,
+                    x="_time",
+                    y="cpu",
+                    color="Device_Friendly",
+                    title="CPU Utilization (%)",
+                    template="plotly_white",
+                    labels={"_time": "Time (UTC)", "cpu": "CPU %", "Device_Friendly": "Device"},
+                    height=350
+                )
+                fig_cpu.update_layout(
+                    margin=dict(l=10, r=10, t=40, b=60),
+                    legend=tel_legend_layout,
+                    hovermode="x unified"
+                )
+                st.plotly_chart(fig_cpu, use_container_width=True)
+                
+            if "mem_free" in tel_plot_df.columns:
+                fig_mem = px.line(
+                    tel_plot_df,
+                    x="_time",
+                    y="mem_free",
+                    color="Device_Friendly",
+                    title="Free Memory (MB)",
+                    template="plotly_white",
+                    labels={"_time": "Time (UTC)", "mem_free": "RAM Free (MB)", "Device_Friendly": "Device"},
+                    height=350
+                )
+                fig_mem.update_layout(
+                    margin=dict(l=10, r=10, t=40, b=60),
+                    legend=tel_legend_layout,
+                    hovermode="x unified"
+                )
+                fig_mem.update_yaxes(rangemode="tozero")
+                st.plotly_chart(fig_mem, use_container_width=True)
+                
             if "shm" in tel_plot_df.columns:
-                st.markdown("**RAM Disk (/run/shm) Space (MB)**")
                 fig_shm = px.line(
                     tel_plot_df,
                     x="_time",
                     y="shm",
                     color="Device_Friendly",
+                    title="RAM Disk (/run/shm) Space (MB)",
                     template="plotly_white",
-                    labels={"_time": "Time", "shm": "SHM Available (MB)", "Device_Friendly": "Device"}
+                    labels={"_time": "Time (UTC)", "shm": "SHM Available (MB)", "Device_Friendly": "Device"},
+                    height=350
                 )
-                fig_shm.update_layout(margin=dict(l=0, r=0, t=10, b=10), height=250)
+                fig_shm.update_layout(
+                    margin=dict(l=10, r=10, t=40, b=60),
+                    legend=tel_legend_layout,
+                    hovermode="x unified"
+                )
                 st.plotly_chart(fig_shm, use_container_width=True)
         else:
             st.info("No numerical telemetry (CPU/Memory/SHM) reported in current window.")
@@ -1116,6 +1155,7 @@ with tab_map:
                     "longitude": info["longitude"]
                 })
     if loc_data:
+        loc_data.sort(key=lambda x: natural_sort_key(x["Name"]))
         loc_df = pd.DataFrame(loc_data)
         render_sensor_map(loc_df, key_suffix="tab_map")
     else:
