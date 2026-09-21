@@ -16,6 +16,16 @@ warnings.simplefilter("ignore")
 # --- DEPLOYED DEVICES SPECIFICATION ---
 DEPLOYED_NAMES = {"UNOQ-10-YV", "UNOQ-11-YV", "UNOQ-12-YV"}
 
+# --- DEVICE NAME OVERRIDES / ALIASES ---
+# Map MAC addresses or hardware IDs to friendly names shown across the dashboard
+DEVICE_NAME_OVERRIDES = {
+    "14:b5:cd:ea:9c:27": "UNOQ-4-allotment-cellular",
+    "14:b5:cd:ea:f9:f5": "UNOQ-2-allotment-wifi",
+    "14:b5:cd:ea:12:1f": "UNOQ-6-garden-lab",
+    "a8-40-41-4a-65-5d-11-3c": "UNOQ-3-garden-lab-LA66",
+    "a8:40:41:6a:c9:5d:11:3d": "UNOQ-7-lab-LA66"
+}
+
 def is_deployed(dev_id, deployments_map):
     """Checks if a device ID or friendly name belongs to the deployed set."""
     if dev_id in deployments_map and deployments_map[dev_id].get("name") in DEPLOYED_NAMES:
@@ -271,6 +281,20 @@ def fetch_device_deployments():
                     }
     except Exception:
         pass
+
+    # Apply manual device name overrides / aliases
+    for dev_id, override_name in DEVICE_NAME_OVERRIDES.items():
+        if dev_id in mapping:
+            if override_name:
+                mapping[dev_id]["name"] = override_name
+        else:
+            mapping[dev_id] = {
+                "name": override_name,
+                "latitude": None,
+                "longitude": None,
+                "version": None
+            }
+
     return mapping
 
 @st.cache_data(ttl=120)
