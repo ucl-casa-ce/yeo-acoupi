@@ -19,11 +19,17 @@ def natural_sort_key(s):
     return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', str(s))]
 
 # --- DEPLOYED DEVICES SPECIFICATION ---
-DEPLOYED_NAMES = {"UNOQ-10-YV", "UNOQ-11-YV", "UNOQ-12-YV"}
+DEPLOYED_NAMES = {
+    "UNOQ-10-YV", "UNOQ-11-YV", "UNOQ-12-YV",
+    "14:b5:cd:ea:1e:6d", "14:b5:cd:ea:1d:a5", "14:b5:cd:ea:07:9f"
+}
 
 # --- DEVICE NAME OVERRIDES / ALIASES ---
 # Map MAC addresses or hardware IDs to friendly names shown across the dashboard
 DEVICE_NAME_OVERRIDES = {
+    "14:b5:cd:ea:1e:6d": "UNOQ-10-YV",
+    "14:b5:cd:ea:1d:a5": "UNOQ-11-YV",
+    "14:b5:cd:ea:07:9f": "UNOQ-12-YV",
     "14:b5:cd:ea:9c:27": "UNOQ-4-allotment-cellular",
     "14:b5:cd:ea:f9:f5": "UNOQ-2-allotment-wifi",
     "14:b5:cd:ea:12:1f": "UNOQ-6-garden-lab",
@@ -31,11 +37,20 @@ DEVICE_NAME_OVERRIDES = {
     "a8:40:41:6a:c9:5d:11:3d": "UNOQ-7-lab-LA66"
 }
 
+# Static fallback metadata for official deployments in case deployment records are pruned
+DEPLOYED_METADATA = {
+    "14:b5:cd:ea:1e:6d": {"name": "UNOQ-10-YV", "latitude": 51.32929, "longitude": -2.70182, "version": "0.1.0"},
+    "14:b5:cd:ea:1d:a5": {"name": "UNOQ-11-YV", "latitude": 51.30654, "longitude": -2.68476, "version": "0.1.0"},
+    "14:b5:cd:ea:07:9f": {"name": "UNOQ-12-YV", "latitude": 51.266107854017896, "longitude": -2.6989246368548527, "version": "0.1.0"}
+}
+
 def is_deployed(dev_id, deployments_map):
     """Checks if a device ID or friendly name belongs to the deployed set."""
+    if dev_id in DEPLOYED_NAMES:
+        return True
     if dev_id in deployments_map and deployments_map[dev_id].get("name") in DEPLOYED_NAMES:
         return True
-    if dev_id in DEPLOYED_NAMES:
+    if dev_id in DEVICE_NAME_OVERRIDES and DEVICE_NAME_OVERRIDES[dev_id] in DEPLOYED_NAMES:
         return True
     return False
 
@@ -262,7 +277,7 @@ def fetch_device_deployments():
     """
     q = f'''
     from(bucket: "{BUCKET}")
-      |> range(start: -30d)
+      |> range(start: 0)
       |> filter(fn: (r) => r["_measurement"] == "acoupi_deployment")
       |> last()
       |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
@@ -287,7 +302,7 @@ def fetch_device_deployments():
     except Exception:
         pass
 
-    # Apply manual device name overrides / aliases
+    # Apply manual device name overrides / aliases and fallback metadata
     for dev_id, override_name in DEVICE_NAME_OVERRIDES.items():
         if dev_id in mapping:
             if override_name:
@@ -299,6 +314,14 @@ def fetch_device_deployments():
                 "longitude": None,
                 "version": None
             }
+        # Fallback coordinates & version if missing from InfluxDB
+        if dev_id in DEPLOYED_METADATA:
+            if mapping[dev_id].get("latitude") is None:
+                mapping[dev_id]["latitude"] = DEPLOYED_METADATA[dev_id]["latitude"]
+            if mapping[dev_id].get("longitude") is None:
+                mapping[dev_id]["longitude"] = DEPLOYED_METADATA[dev_id]["longitude"]
+            if not mapping[dev_id].get("version"):
+                mapping[dev_id]["version"] = DEPLOYED_METADATA[dev_id]["version"]
 
     return mapping
 
@@ -307,7 +330,7 @@ def fetch_known_devices():
     """Fetches unique device identifiers with active data from InfluxDB."""
     q_dev = f'''
     from(bucket: "{BUCKET}")
-      |> range(start: -30d)
+      |> range(start: -90d)
       |> filter(fn: (r) => r["_measurement"] == "acoupi_detections" or r["_measurement"] == "acoupi_data" or r["_measurement"] == "acoupi_heartbeat" or r["_measurement"] == "acoupi_deployment")
       |> keep(columns: ["device_id"])
       |> group()
@@ -315,7 +338,7 @@ def fetch_known_devices():
     '''
     q_top = f'''
     from(bucket: "{BUCKET}")
-      |> range(start: -30d)
+      |> range(start: -90d)
       |> filter(fn: (r) => r["_measurement"] == "acoupi_detections" or r["_measurement"] == "acoupi_data" or r["_measurement"] == "acoupi_heartbeat" or r["_measurement"] == "acoupi_deployment")
       |> keep(columns: ["topic"])
       |> group()
