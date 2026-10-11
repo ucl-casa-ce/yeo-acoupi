@@ -632,20 +632,21 @@ def render_recording_explorer(deployments=None):
                     time_label = item["time_display"]
                     if item["matched"]:
                         conf = item.get("confidence") or 0.0
+                        conf_pct = item.get("confidence_pct", f"{conf * 100:.1f}%")
                         if conf >= 0.8:
                             badge_color = "#10b981"  # Emerald green
-                            conf_label = "High Confidence"
+                            conf_label = "High"
                         elif conf >= 0.5:
                             badge_color = "#f59e0b"  # Amber
-                            conf_label = "Medium Confidence"
+                            conf_label = "Med"
                         else:
                             badge_color = "#ef4444"  # Red
-                            conf_label = "Low Confidence"
+                            conf_label = "Low"
 
                         st.markdown(
                             f"<div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;'>"
                             f"  <span style='font-size: 0.95rem; font-weight: 600;'>⏱️ {time_label}</span>"
-                            f"  <span style='background: {badge_color}22; color: {badge_color}; border: 1px solid {badge_color}; border-radius: 12px; padding: 2px 8px; font-size: 0.75rem; font-weight: 600;'>{conf_label}</span>"
+                            f"  <span style='background: {badge_color}22; color: {badge_color}; border: 1px solid {badge_color}; border-radius: 12px; padding: 2px 8px; font-size: 0.75rem; font-weight: 600;'>{conf_pct} · {conf_label}</span>"
                             f"</div>",
                             unsafe_allow_html=True
                         )
