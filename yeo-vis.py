@@ -1027,7 +1027,7 @@ else:
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
 
-    st.plotly_chart(fig_timeline, use_container_width=True)
+    st.plotly_chart(fig_timeline, use_container_width=True, key="fig_timeline")
 
     st.divider()
 
@@ -1097,7 +1097,7 @@ else:
         xaxis=dict(tickmode="linear", tick0=0, dtick=1),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
-    st.plotly_chart(fig_hourly, use_container_width=True)
+    st.plotly_chart(fig_hourly, use_container_width=True, key="fig_hourly")
 
     st.divider()
 
@@ -1183,7 +1183,7 @@ with tab_telemetry:
                     legend=tel_legend_layout,
                     hovermode="x unified"
                 )
-                st.plotly_chart(fig_cpu, use_container_width=True)
+                st.plotly_chart(fig_cpu, use_container_width=True, key="fig_cpu")
                 
             if "mem_free" in tel_plot_df.columns:
                 fig_mem = px.line(
@@ -1202,7 +1202,7 @@ with tab_telemetry:
                     hovermode="x unified"
                 )
                 fig_mem.update_yaxes(rangemode="tozero")
-                st.plotly_chart(fig_mem, use_container_width=True)
+                st.plotly_chart(fig_mem, use_container_width=True, key="fig_mem")
                 
             if "shm" in tel_plot_df.columns:
                 fig_shm = px.line(
@@ -1220,7 +1220,7 @@ with tab_telemetry:
                     legend=tel_legend_layout,
                     hovermode="x unified"
                 )
-                st.plotly_chart(fig_shm, use_container_width=True)
+                st.plotly_chart(fig_shm, use_container_width=True, key="fig_shm")
         else:
             st.info("No numerical telemetry (CPU/Memory/SHM) reported in current window.")
     else:
@@ -1382,7 +1382,7 @@ with tab_heatmap:
                 template="plotly_white"
             )
 
-            st.plotly_chart(fig_hm, use_container_width=True)
+            st.plotly_chart(fig_hm, use_container_width=True, key=f"fig_hm_{dev_id}")
             st.divider()
 
 with tab_map:
