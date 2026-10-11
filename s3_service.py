@@ -64,12 +64,12 @@ def load_s3_config() -> dict:
         except Exception:
             pass
 
-    # 3. Fallback environment variables
+    # 3. Fallback environment variables (support both S3_* and STREAMLIT_S3_* prefixes)
     return {
-        "ENDPOINT_URL": os.getenv("S3_ENDPOINT_URL", "https://buckets.cetools.org"),
-        "ACCESS_KEY": os.getenv("S3_ACCESS_KEY", ""),
-        "SECRET_KEY": os.getenv("S3_SECRET_KEY", ""),
-        "BUCKET_NAME": os.getenv("S3_BUCKET_NAME", "yeo"),
+        "ENDPOINT_URL": os.getenv("STREAMLIT_S3_ENDPOINT_URL") or os.getenv("S3_ENDPOINT_URL", "https://buckets.cetools.org"),
+        "ACCESS_KEY": os.getenv("STREAMLIT_S3_ACCESS_KEY") or os.getenv("S3_ACCESS_KEY", ""),
+        "SECRET_KEY": os.getenv("STREAMLIT_S3_SECRET_KEY") or os.getenv("S3_SECRET_KEY", ""),
+        "BUCKET_NAME": os.getenv("STREAMLIT_S3_BUCKET_NAME") or os.getenv("S3_BUCKET_NAME", "yeo"),
     }
 
 def get_s3_client():
