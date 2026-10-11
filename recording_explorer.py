@@ -6,6 +6,7 @@ and view matched machine learning classification telemetry from InfluxDB.
 
 import math
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 from datetime import datetime, timezone
 
@@ -54,6 +55,323 @@ def get_species_group(common_name: str, scientific_name: str, taxa: str) -> str:
         if any(x in c for x in ["woodpecker"]):
             return "Woodpeckers"
         return "Other Birds"
+
+def render_bat_audio_player(audio_url: str, default_rate: float = 0.1):
+    """
+    Renders a Web Audio API player for ultrasonic bat audio.
+    Crucially drops pitch without preservation so ultrasound (>20kHz) becomes audible to humans.
+    """
+    html_code = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <meta charset="utf-8">
+    <style>
+      body {{
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        color: #1e293b;
+        background: transparent;
+      }}
+      .player-box {{
+        background: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 6px 10px;
+        box-sizing: border-box;
+      }}
+      .controls-row {{
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }}
+      .play-btn {{
+        background: #0284c7;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 5px 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex-shrink: 0;
+        transition: background 0.15s ease;
+      }}
+      .play-btn:hover {{
+        background: #0369a1;
+      }}
+      .time-text {{
+        font-size: 0.72rem;
+        color: #475569;
+        font-variant-numeric: tabular-nums;
+        min-width: 70px;
+        text-align: right;
+        flex-shrink: 0;
+      }}
+      .seek-bar {{
+        flex-grow: 1;
+        cursor: pointer;
+        accent-color: #0284c7;
+        height: 6px;
+      }}
+      .speed-row {{
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 5px;
+        padding-top: 4px;
+        border-top: 1px dashed #cbd5e1;
+        font-size: 0.72rem;
+        color: #64748b;
+      }}
+      .speed-btn-group {{
+        display: flex;
+        gap: 4px;
+      }}
+      .speed-btn {{
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 4px;
+        padding: 1px 6px;
+        font-size: 0.68rem;
+        cursor: pointer;
+        color: #334155;
+        transition: all 0.15s ease;
+      }}
+      .speed-btn.active {{
+        background: #0284c7;
+        color: #ffffff;
+        border-color: #0284c7;
+        font-weight: 600;
+      }}
+      .status-badge {{
+        font-size: 0.7rem;
+        color: #0369a1;
+        font-weight: 500;
+      }}
+    </style>
+    </head>
+    <body>
+    <div class="player-box">
+      <div class="controls-row">
+        <button id="playBtn" class="play-btn" onclick="togglePlay()">
+          <span id="playIcon">▶</span> <span id="playLabel">Play</span>
+        </button>
+        <input type="range" id="seekBar" class="seek-bar" value="0" min="0" max="100" step="0.1" oninput="onSeekInput()" onchange="onSeekChange()">
+        <span id="timeDisplay" class="time-text">0:00 / --:--</span>
+      </div>
+      <div class="speed-row">
+        <span class="status-badge" id="statusBadge">🦇 10x Slower (Audible)</span>
+        <div class="speed-btn-group">
+          <button class="speed-btn {'active' if default_rate == 0.1 else ''}" id="btn-0.1" onclick="setSpeed(0.1)">0.1x (Audible)</button>
+          <button class="speed-btn {'active' if default_rate == 0.25 else ''}" id="btn-0.25" onclick="setSpeed(0.25)">0.25x</button>
+          <button class="speed-btn {'active' if default_rate == 0.5 else ''}" id="btn-0.5" onclick="setSpeed(0.5)">0.5x</button>
+          <button class="speed-btn {'active' if default_rate == 1.0 else ''}" id="btn-1.0" onclick="setSpeed(1.0)">1.0x</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let audioCtx = null;
+      let audioBuffer = null;
+      let currentSource = null;
+      let isPlaying = false;
+      let startCtxTime = 0;
+      let offsetBufferTime = 0;
+      let currentRate = {default_rate};
+      let isSeeking = false;
+      let animId = null;
+      const audioUrl = "{audio_url}";
+
+      function getAudioContext() {{
+        if (!audioCtx) {{
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }}
+        if (audioCtx.state === 'suspended') {{
+          audioCtx.resume();
+        }}
+        return audioCtx;
+      }}
+
+      function formatTime(sec) {{
+        if (isNaN(sec) || sec < 0) sec = 0;
+        const m = Math.floor(sec / 60);
+        const s = Math.floor(sec % 60);
+        return m + ":" + (s < 10 ? "0" : "") + s;
+      }}
+
+      function updateUI() {{
+        if (!audioBuffer) return;
+        const bufDuration = audioBuffer.duration;
+        const playDuration = bufDuration / currentRate;
+
+        if (isPlaying && !isSeeking) {{
+          const elapsedCtx = audioCtx.currentTime - startCtxTime;
+          const currentBufPos = offsetBufferTime + (elapsedCtx * currentRate);
+          
+          if (currentBufPos >= bufDuration) {{
+            stopPlayback(true);
+            return;
+          }}
+          
+          const currentPlayPos = currentBufPos / currentRate;
+          document.getElementById("seekBar").value = (currentBufPos / bufDuration) * 100;
+          document.getElementById("timeDisplay").textContent = formatTime(currentPlayPos) + " / " + formatTime(playDuration);
+        }}
+        
+        if (isPlaying) {{
+          animId = requestAnimationFrame(updateUI);
+        }}
+      }}
+
+      async function togglePlay() {{
+        const ctx = getAudioContext();
+        if (isPlaying) {{
+          pausePlayback();
+          return;
+        }}
+
+        if (!audioBuffer) {{
+          document.getElementById("playLabel").textContent = "Loading...";
+          document.getElementById("playBtn").disabled = true;
+          try {{
+            const resp = await fetch(audioUrl);
+            const arrayBuf = await resp.arrayBuffer();
+            audioBuffer = await ctx.decodeAudioData(arrayBuf);
+          }} catch (err) {{
+            document.getElementById("playLabel").textContent = "Error";
+            document.getElementById("statusBadge").textContent = "Failed to load audio";
+            document.getElementById("playBtn").disabled = false;
+            return;
+          }}
+          document.getElementById("playBtn").disabled = false;
+        }}
+
+        startPlaybackAt(offsetBufferTime);
+      }}
+
+      function startPlaybackAt(bufOffset) {{
+        const ctx = getAudioContext();
+        if (currentSource) {{
+          try {{ currentSource.stop(); }} catch (e) {{}}
+        }}
+
+        offsetBufferTime = bufOffset;
+        currentSource = ctx.createBufferSource();
+        currentSource.buffer = audioBuffer;
+        currentSource.playbackRate.value = currentRate;
+        currentSource.connect(ctx.destination);
+        
+        startCtxTime = ctx.currentTime;
+        currentSource.start(0, offsetBufferTime);
+        isPlaying = true;
+
+        document.getElementById("playIcon").textContent = "⏸";
+        document.getElementById("playLabel").textContent = "Pause";
+        
+        cancelAnimationFrame(animId);
+        animId = requestAnimationFrame(updateUI);
+      }}
+
+      function pausePlayback() {{
+        if (!isPlaying) return;
+        const ctx = getAudioContext();
+        const elapsedCtx = ctx.currentTime - startCtxTime;
+        offsetBufferTime = offsetBufferTime + (elapsedCtx * currentRate);
+        
+        if (currentSource) {{
+          try {{ currentSource.stop(); }} catch (e) {{}}
+          currentSource = null;
+        }}
+        isPlaying = false;
+        cancelAnimationFrame(animId);
+
+        document.getElementById("playIcon").textContent = "▶";
+        document.getElementById("playLabel").textContent = "Play";
+      }}
+
+      function stopPlayback(resetToStart = false) {{
+        if (currentSource) {{
+          try {{ currentSource.stop(); }} catch (e) {{}}
+          currentSource = null;
+        }}
+        isPlaying = false;
+        cancelAnimationFrame(animId);
+        
+        document.getElementById("playIcon").textContent = "▶";
+        document.getElementById("playLabel").textContent = "Play";
+        
+        if (resetToStart) {{
+          offsetBufferTime = 0;
+          document.getElementById("seekBar").value = 0;
+          if (audioBuffer) {{
+            const playDuration = audioBuffer.duration / currentRate;
+            document.getElementById("timeDisplay").textContent = "0:00 / " + formatTime(playDuration);
+          }}
+        }}
+      }}
+
+      function onSeekInput() {{
+        isSeeking = true;
+        if (audioBuffer) {{
+          const pct = parseFloat(document.getElementById("seekBar").value) / 100;
+          const targetBufPos = pct * audioBuffer.duration;
+          const targetPlayPos = targetBufPos / currentRate;
+          const playDuration = audioBuffer.duration / currentRate;
+          document.getElementById("timeDisplay").textContent = formatTime(targetPlayPos) + " / " + formatTime(playDuration);
+        }}
+      }}
+
+      function onSeekChange() {{
+        isSeeking = false;
+        if (audioBuffer) {{
+          const pct = parseFloat(document.getElementById("seekBar").value) / 100;
+          const targetBufPos = pct * audioBuffer.duration;
+          if (isPlaying) {{
+            startPlaybackAt(targetBufPos);
+          }} else {{
+            offsetBufferTime = targetBufPos;
+          }}
+        }}
+      }}
+
+      function setSpeed(rate) {{
+        currentRate = rate;
+        ['0.1', '0.25', '0.5', '1.0'].forEach(s => {{
+          const btn = document.getElementById('btn-' + s);
+          if (btn) btn.classList.remove('active');
+        }});
+        const activeBtn = document.getElementById('btn-' + rate.toString());
+        if (activeBtn) activeBtn.classList.add('active');
+
+        if (rate === 0.1) {{
+          document.getElementById("statusBadge").textContent = "🦇 10x Slower (Audible)";
+        }} else if (rate === 1.0) {{
+          document.getElementById("statusBadge").textContent = "⚡ Real-time (Ultrasonic)";
+        }} else {{
+          document.getElementById("statusBadge").textContent = (1 / rate).toFixed(1) + "x Slower";
+        }}
+
+        if (isPlaying) {{
+          const ctx = getAudioContext();
+          const elapsedCtx = ctx.currentTime - startCtxTime;
+          const currentBufPos = offsetBufferTime + (elapsedCtx * currentSource.playbackRate.value);
+          startPlaybackAt(currentBufPos);
+        }} else if (audioBuffer) {{
+          const playDuration = audioBuffer.duration / currentRate;
+          const currentPlayPos = offsetBufferTime / currentRate;
+          document.getElementById("timeDisplay").textContent = formatTime(currentPlayPos) + " / " + formatTime(playDuration);
+        }}
+      }}
+    </script>
+    </body>
+    </html>
+    """
+    components.html(html_code, height=72)
 
 def render_recording_explorer(deployments=None):
     """Renders the main Recording & Spectrogram Explorer page."""
@@ -111,14 +429,23 @@ def render_recording_explorer(deployments=None):
 
     # 4. Bat Ultrasonic Playback Speed Setting
     is_bat = (taxa_key == "bat")
-    playback_speed = "1.0x"
+    playback_speed = "0.1x (10x slower - Audible)"
+    speed_float = 0.1
     if is_bat:
         playback_speed = st.sidebar.select_slider(
-            "Bat Ultrasound Playback Rate:",
-            options=["0.05x (20x slower)", "0.1x (10x slower - Audible)", "0.25x (4x slower)", "1.0x (Real-time)"],
+            "Default Bat Playback Rate:",
+            options=["0.1x (10x slower - Audible)", "0.25x (4x slower)", "0.5x (2x slower)", "1.0x (Real-time)"],
             value="0.1x (10x slower - Audible)",
             help="Bat calls are ultrasonic (>20kHz). Slowing down audio time-expands high frequencies into the human hearing range."
         )
+        if "0.1x" in playback_speed:
+            speed_float = 0.1
+        elif "0.25x" in playback_speed:
+            speed_float = 0.25
+        elif "0.5x" in playback_speed:
+            speed_float = 0.5
+        elif "1.0x" in playback_speed:
+            speed_float = 1.0
 
     # --- FETCH & CORRELATE DATA ---
     with st.spinner(f"Loading recordings for {selected_date}..."):
@@ -145,7 +472,6 @@ def render_recording_explorer(deployments=None):
 
     # 1. Species Group / Type Filter
     available_groups = sorted(list(set(r["species_group"] for r in enriched_recordings)))
-    # Put "All Species Types" first
     group_options = ["All Species Types"] + [g for g in available_groups if g != "Uncorrelated / Unclassified"]
     if "Uncorrelated / Unclassified" in available_groups:
         group_options.append("Uncorrelated / Unclassified")
@@ -231,12 +557,6 @@ def render_recording_explorer(deployments=None):
         filtered_recordings.append(r)
 
     # --- APPLY SORTING ---
-    def sort_key_fn(item):
-        ts = item["timestamp"] if item.get("timestamp") else datetime.min.replace(tzinfo=timezone.utc)
-        conf = item["confidence"] if item.get("confidence") is not None else -1.0
-        sp = item.get("common_name", "")
-        return ts, conf, sp
-
     if "Earliest First" in sort_option:
         filtered_recordings.sort(key=lambda r: r["timestamp"] if r.get("timestamp") else datetime.min.replace(tzinfo=timezone.utc))
     elif "Latest First" in sort_option:
@@ -297,15 +617,6 @@ def render_recording_explorer(deployments=None):
     end_idx = min(start_idx + items_per_page, total_filtered)
     page_items = filtered_recordings[start_idx:end_idx]
 
-    # Parse speed multiplier for HTML5 audio
-    speed_float = 1.0
-    if "0.05x" in playback_speed:
-        speed_float = 0.05
-    elif "0.1x" in playback_speed:
-        speed_float = 0.1
-    elif "0.25x" in playback_speed:
-        speed_float = 0.25
-
     # --- RECORDING GALLERY GRID (3 Columns) ---
     st.markdown(f"#### 🖼️ Gallery — Page {current_page} of {total_pages}")
     cols_per_row = 3
@@ -347,7 +658,7 @@ def render_recording_explorer(deployments=None):
                             unsafe_allow_html=True
                         )
 
-                    # 2. Spectrogram Image (using width="stretch" to eliminate deprecation warning)
+                    # 2. Spectrogram Image
                     st.image(
                         item["spect_url"],
                         caption=f"{item['filename']}",
@@ -379,28 +690,9 @@ def render_recording_explorer(deployments=None):
 
                     # 4. Audio Player
                     audio_url = item["audio_url"]
-                    if is_bat and speed_float != 1.0:
-                        player_id = f"aud_{item['uuid'][:8] if item['uuid'] else idx}_{current_page}"
-                        html_player = f"""
-                        <div style="margin-top: 6px;">
-                            <audio id="{player_id}" controls preload="none" style="width: 100%; height: 36px;">
-                                <source src="{audio_url}" type="audio/wav">
-                            </audio>
-                            <script>
-                                (function() {{
-                                    var aud = document.getElementById("{player_id}");
-                                    if (aud) {{
-                                        aud.playbackRate = {speed_float};
-                                        aud.onplay = function() {{ aud.playbackRate = {speed_float}; }};
-                                    }}
-                                }})();
-                            </script>
-                            <div style="font-size: 0.72rem; color: #0284c7; text-align: right; margin-top: 2px;">
-                                ⚡ Playback: {speed_float}x ({playback_speed.split('(')[-1].rstrip(')')})
-                            </div>
-                        </div>
-                        """
-                        st.html(html_player)
+                    if is_bat:
+                        # Dedicated Web Audio API player for ultrasonic time expansion
+                        render_bat_audio_player(audio_url, default_rate=speed_float)
                     else:
                         st.audio(audio_url, format="audio/wav")
 
