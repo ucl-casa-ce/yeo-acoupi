@@ -22,18 +22,21 @@ except ImportError:
 def load_influx_config() -> dict:
     """Loads InfluxDB configuration from secrets or environment."""
     config = {
-        "URL": os.getenv("INFLUX_URL"),
-        "TOKEN": os.getenv("INFLUX_TOKEN"),
-        "ORG": os.getenv("INFLUX_ORG"),
-        "BUCKET": os.getenv("INFLUX_BUCKET", "CE_yeo"),
+        "URL": os.getenv("STREAMLIT_INFLUX_URL") or os.getenv("INFLUX_URL"),
+        "TOKEN": os.getenv("STREAMLIT_INFLUX_TOKEN") or os.getenv("INFLUX_TOKEN"),
+        "ORG": os.getenv("STREAMLIT_INFLUX_ORG") or os.getenv("INFLUX_ORG"),
+        "BUCKET": os.getenv("STREAMLIT_INFLUX_BUCKET") or os.getenv("INFLUX_BUCKET", "CE_yeo"),
     }
     
     # Check Streamlit secrets
     try:
         if hasattr(st, "secrets"):
             for k in ["INFLUX_URL", "INFLUX_TOKEN", "INFLUX_ORG", "INFLUX_BUCKET"]:
+                short_k = k.replace("INFLUX_", "")
                 if k in st.secrets:
-                    config[k.replace("INFLUX_", "")] = st.secrets[k]
+                    config[short_k] = st.secrets[k]
+                elif f"STREAMLIT_{k}" in st.secrets:
+                    config[short_k] = st.secrets[f"STREAMLIT_{k}"]
     except Exception:
         pass
 
@@ -43,8 +46,11 @@ def load_influx_config() -> dict:
         try:
             data = toml.load(secrets_path)
             for k in ["INFLUX_URL", "INFLUX_TOKEN", "INFLUX_ORG", "INFLUX_BUCKET"]:
-                if k in data and not config.get(k.replace("INFLUX_", "")):
-                    config[k.replace("INFLUX_", "")] = data[k]
+                short_k = k.replace("INFLUX_", "")
+                if k in data and not config.get(short_k):
+                    config[short_k] = data[k]
+                elif f"STREAMLIT_{k}" in data and not config.get(short_k):
+                    config[short_k] = data[f"STREAMLIT_{k}"]
         except Exception:
             pass
 

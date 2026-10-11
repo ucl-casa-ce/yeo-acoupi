@@ -27,10 +27,10 @@ from datetime import datetime, timezone
 def load_config():
     """Load configuration from environment variables or .streamlit/secrets.toml."""
     config = {
-        "URL": os.getenv("INFLUX_URL"),
-        "TOKEN": os.getenv("INFLUX_TOKEN"),
-        "ORG": os.getenv("INFLUX_ORG"),
-        "BUCKET": os.getenv("INFLUX_BUCKET"),
+        "URL": os.getenv("STREAMLIT_INFLUX_URL") or os.getenv("INFLUX_URL"),
+        "TOKEN": os.getenv("STREAMLIT_INFLUX_TOKEN") or os.getenv("INFLUX_TOKEN"),
+        "ORG": os.getenv("STREAMLIT_INFLUX_ORG") or os.getenv("INFLUX_ORG"),
+        "BUCKET": os.getenv("STREAMLIT_INFLUX_BUCKET") or os.getenv("INFLUX_BUCKET"),
     }
 
     # Fallback to .streamlit/secrets.toml if available
