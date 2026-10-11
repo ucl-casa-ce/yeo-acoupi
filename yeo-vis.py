@@ -21,16 +21,61 @@ def natural_sort_key(s):
 
 # --- DEPLOYED DEVICES SPECIFICATION ---
 DEPLOYED_NAMES = {
-    "UNOQ-10-YV", "UNOQ-11-YV", "UNOQ-12-YV",
-    "14:b5:cd:ea:1e:6d", "14:b5:cd:ea:1d:a5", "14:b5:cd:ea:07:9f"
+    # Friendly names
+    "UNOQ-17-YV", "UNOQ-18-YV", "UNOQ-21-YV", "UNOQ-22-YV",
+    # Hostnames
+    "yeo-unoq-17", "yeo-unoq-18", "yeo-unoq-21", "yeo-unoq-22",
+    "unoq-17-yv", "unoq-18-yv", "unoq-21-yv", "unoq-22-yv",
+    # Hardware MAC addresses
+    "14:b5:cd:ea:c5:4b", "14:b5:cd:ea:08:1b", "14:b5:cd:e8:b1:43", "14:b5:cd:e9:f5:eb"
 }
 
 # --- DEVICE NAME OVERRIDES / ALIASES ---
 # Map MAC addresses or hardware IDs to friendly names shown across the dashboard
 DEVICE_NAME_OVERRIDES = {
-    "14:b5:cd:ea:1e:6d": "UNOQ-10-YV",
-    "14:b5:cd:ea:1d:a5": "UNOQ-11-YV",
-    "14:b5:cd:ea:07:9f": "UNOQ-12-YV",
+    # Deployed Devices
+    "14:b5:cd:ea:c5:4b": "UNOQ-17-YV",
+    "yeo-unoq-17": "UNOQ-17-YV",
+    "unoq-17-yv": "UNOQ-17-YV",
+
+    "14:b5:cd:ea:08:1b": "UNOQ-18-YV",
+    "yeo-unoq-18": "UNOQ-18-YV",
+    "unoq-18-yv": "UNOQ-18-YV",
+
+    "14:b5:cd:e8:b1:43": "UNOQ-21-YV",
+    "yeo-unoq-21": "UNOQ-21-YV",
+    "unoq-21-yv": "UNOQ-21-YV",
+
+    "14:b5:cd:e9:f5:eb": "UNOQ-22-YV",
+    "yeo-unoq-22": "UNOQ-22-YV",
+    "unoq-22-yv": "UNOQ-22-YV",
+
+    # Reassigned Test Devices (formerly UNOQ-10-YV, UNOQ-11-YV, UNOQ-12-YV)
+    "14:b5:cd:ea:1e:6d": "UNOQ-29-YV",
+    "UNOQ-10-YV": "UNOQ-29-YV",
+    "yeo-unoq-10": "UNOQ-29-YV",
+    "unoq-10-yv": "UNOQ-29-YV",
+    "UNOQ-29-YV": "UNOQ-29-YV",
+    "yeo-unoq-29": "UNOQ-29-YV",
+    "unoq-29-yv": "UNOQ-29-YV",
+
+    "14:b5:cd:ea:1d:a5": "UNOQ-30-YV",
+    "UNOQ-11-YV": "UNOQ-30-YV",
+    "yeo-unoq-11": "UNOQ-30-YV",
+    "unoq-11-yv": "UNOQ-30-YV",
+    "UNOQ-30-YV": "UNOQ-30-YV",
+    "yeo-unoq-30": "UNOQ-30-YV",
+    "unoq-30-yv": "UNOQ-30-YV",
+
+    "14:b5:cd:ea:07:9f": "UNOQ-31-YV",
+    "UNOQ-12-YV": "UNOQ-31-YV",
+    "yeo-unoq-12": "UNOQ-31-YV",
+    "unoq-12-yv": "UNOQ-31-YV",
+    "UNOQ-31-YV": "UNOQ-31-YV",
+    "yeo-unoq-31": "UNOQ-31-YV",
+    "unoq-31-yv": "UNOQ-31-YV",
+
+    # Other Test / Lab Devices
     "14:b5:cd:ea:9c:27": "UNOQ-4-allotment-cellular",
     "14:b5:cd:ea:f9:f5": "UNOQ-2-allotment-wifi",
     "14:b5:cd:ea:12:1f": "UNOQ-6-garden-lab",
@@ -38,11 +83,12 @@ DEVICE_NAME_OVERRIDES = {
     "a8:40:41:6a:c9:5d:11:3d": "UNOQ-7-lab-LA66"
 }
 
-# Static fallback metadata for official deployments in case deployment records are pruned
+# Static fallback metadata for official deployments in case deployment records are pruned from InfluxDB
 DEPLOYED_METADATA = {
-    "14:b5:cd:ea:1e:6d": {"name": "UNOQ-10-YV", "latitude": 51.32929, "longitude": -2.70182, "version": "0.1.0"},
-    "14:b5:cd:ea:1d:a5": {"name": "UNOQ-11-YV", "latitude": 51.30654, "longitude": -2.68476, "version": "0.1.0"},
-    "14:b5:cd:ea:07:9f": {"name": "UNOQ-12-YV", "latitude": 51.266107854017896, "longitude": -2.6989246368548527, "version": "0.1.0"}
+    "14:b5:cd:ea:c5:4b": {"name": "UNOQ-17-YV", "latitude": None, "longitude": None, "version": "0.1.0"},
+    "14:b5:cd:ea:08:1b": {"name": "UNOQ-18-YV", "latitude": None, "longitude": None, "version": "0.1.0"},
+    "14:b5:cd:e8:b1:43": {"name": "UNOQ-21-YV", "latitude": None, "longitude": None, "version": "0.1.0"},
+    "14:b5:cd:e9:f5:eb": {"name": "UNOQ-22-YV", "latitude": None, "longitude": None, "version": "0.1.0"},
 }
 
 def is_deployed(dev_id, deployments_map):

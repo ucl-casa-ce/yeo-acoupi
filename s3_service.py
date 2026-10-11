@@ -14,19 +14,50 @@ import streamlit as st
 
 # Default fallback device to S3 folder mapping
 DEVICE_TO_S3_FOLDER = {
-    # Friendly names
+    # Friendly names - Deployed
+    "UNOQ-17-YV": "YV17-recordings",
+    "UNOQ-18-YV": "YV18-recordings",
+    "UNOQ-21-YV": "YV21-recordings",
+    "UNOQ-22-YV": "YV22-recordings",
+    # Friendly names - Reassigned Test Devices
+    "UNOQ-29-YV": "YV29-recordings",
+    "UNOQ-30-YV": "YV30-recordings",
+    "UNOQ-31-YV": "YV31-recordings",
+    # Legacy names for historical S3 folders
     "UNOQ-10-YV": "YV10-recordings",
     "UNOQ-11-YV": "YV11-recordings",
     "UNOQ-12-YV": "YV12-recordings",
     # Hardware MAC addresses
-    "14:b5:cd:ea:1e:6d": "YV10-recordings",
-    "14:b5:cd:ea:1d:a5": "YV11-recordings",
-    "14:b5:cd:ea:07:9f": "YV12-recordings",
-    # Lowercase identifiers
+    "14:b5:cd:ea:c5:4b": "YV17-recordings",
+    "14:b5:cd:ea:08:1b": "YV18-recordings",
+    "14:b5:cd:e8:b1:43": "YV21-recordings",
+    "14:b5:cd:e9:f5:eb": "YV22-recordings",
+    "14:b5:cd:ea:1e:6d": "YV29-recordings",
+    "14:b5:cd:ea:1d:a5": "YV30-recordings",
+    "14:b5:cd:ea:07:9f": "YV31-recordings",
+    # Hostnames & Lowercase
+    "yeo-unoq-17": "YV17-recordings",
+    "yeo-unoq-18": "YV18-recordings",
+    "yeo-unoq-21": "YV21-recordings",
+    "yeo-unoq-22": "YV22-recordings",
+    "unoq-17-yv": "YV17-recordings",
+    "unoq-18-yv": "YV18-recordings",
+    "unoq-21-yv": "YV21-recordings",
+    "unoq-22-yv": "YV22-recordings",
+    "unoq-29-yv": "YV29-recordings",
+    "unoq-30-yv": "YV30-recordings",
+    "unoq-31-yv": "YV31-recordings",
     "unoq-10-yv": "YV10-recordings",
     "unoq-11-yv": "YV11-recordings",
     "unoq-12-yv": "YV12-recordings",
     # Direct folder names
+    "YV17-recordings": "YV17-recordings",
+    "YV18-recordings": "YV18-recordings",
+    "YV21-recordings": "YV21-recordings",
+    "YV22-recordings": "YV22-recordings",
+    "YV29-recordings": "YV29-recordings",
+    "YV30-recordings": "YV30-recordings",
+    "YV31-recordings": "YV31-recordings",
     "YV10-recordings": "YV10-recordings",
     "YV11-recordings": "YV11-recordings",
     "YV12-recordings": "YV12-recordings",
@@ -34,12 +65,26 @@ DEVICE_TO_S3_FOLDER = {
 
 # Reverse mapping for Friendly Device Display
 S3_FOLDER_TO_DEVICE_NAME = {
+    "YV17-recordings": "UNOQ-17-YV",
+    "YV18-recordings": "UNOQ-18-YV",
+    "YV21-recordings": "UNOQ-21-YV",
+    "YV22-recordings": "UNOQ-22-YV",
+    "YV29-recordings": "UNOQ-29-YV",
+    "YV30-recordings": "UNOQ-30-YV",
+    "YV31-recordings": "UNOQ-31-YV",
     "YV10-recordings": "UNOQ-10-YV",
     "YV11-recordings": "UNOQ-11-YV",
     "YV12-recordings": "UNOQ-12-YV",
 }
 
 S3_FOLDER_TO_MAC = {
+    "YV17-recordings": "14:b5:cd:ea:c5:4b",
+    "YV18-recordings": "14:b5:cd:ea:08:1b",
+    "YV21-recordings": "14:b5:cd:e8:b1:43",
+    "YV22-recordings": "14:b5:cd:e9:f5:eb",
+    "YV29-recordings": "14:b5:cd:ea:1e:6d",
+    "YV30-recordings": "14:b5:cd:ea:1d:a5",
+    "YV31-recordings": "14:b5:cd:ea:07:9f",
     "YV10-recordings": "14:b5:cd:ea:1e:6d",
     "YV11-recordings": "14:b5:cd:ea:1d:a5",
     "YV12-recordings": "14:b5:cd:ea:07:9f",
