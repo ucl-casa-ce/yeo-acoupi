@@ -11,6 +11,7 @@ from astral import LocationInfo
 from astral.sun import sun
 from datetime import datetime, timedelta
 import warnings
+from recording_explorer import render_recording_explorer
 
 warnings.simplefilter("ignore")
 
@@ -397,7 +398,7 @@ known_devices = sorted(list(set(known_devices)), key=natural_sort_key)
 st.sidebar.markdown("## Devices")
 page = st.sidebar.radio(
     "Select:",
-    ["Deployed Devices", "Test / Setup Devices", "Info + Map"],
+    ["Deployed Devices", "Test / Setup Devices", "Recording Explorer", "Info + Map"],
     index=0
 )
 
@@ -410,7 +411,7 @@ else:
     active_devices = known_devices
 
 # --- SIDEBAR CONTROLS ---
-if page != "Info + Map":
+if page not in ["Info + Map", "Recording Explorer"]:
     st.sidebar.markdown("## Dashboard Controls")
 
     # 1. Device Selection Dropdown (Placed ABOVE Time Selector)
@@ -516,7 +517,7 @@ def fetch_heartbeat_data(time_val="-7d"):
         return pd.DataFrame()
 
 hb_df = pd.DataFrame()
-if page != "Info + Map":
+if page not in ["Info + Map", "Recording Explorer"]:
     hb_df = fetch_heartbeat_data(selected_time_val)
 
 # Process Heartbeat Data
@@ -535,7 +536,7 @@ def resolve_device_id(row):
             return parts[1]
     return "unknown"
 
-if page != "Info + Map" and not hb_df.empty:
+if page not in ["Info + Map", "Recording Explorer"] and not hb_df.empty:
     hb_df["Device"] = hb_df.apply(resolve_device_id, axis=1)
     hb_df = hb_df[hb_df["Device"].isin(active_devices)]
     
@@ -601,7 +602,7 @@ if page != "Info + Map" and not hb_df.empty:
     else:
         st.sidebar.warning("No heartbeat data in the selected period")
 else:
-    if page != "Info + Map":
+    if page not in ["Info + Map", "Recording Explorer"]:
         st.sidebar.warning("No heartbeat data in the selected period")
 
 # --- DETECTIONS QUERY ---
@@ -740,8 +741,13 @@ def render_sensor_map(loc_df, key_suffix=""):
     st.components.v1.html(leaflet_html, height=500)
 
 raw_df = pd.DataFrame()
-if page != "Info + Map":
+if page not in ["Info + Map", "Recording Explorer"]:
     raw_df = fetch_detection_data(selected_time_val)
+
+# --- ROUTE PAGE CONTENT ---
+if page == "Recording Explorer":
+    render_recording_explorer(deployments)
+    st.stop()
 
 # --- HEADER TITLE ---
 st.title("🌿 Yeo Valley Bioacoustic Monitoring")
