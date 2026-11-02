@@ -10,17 +10,22 @@ ENV PYTHONUNBUFFERED=1 \
 # Set the working directory inside the container
 WORKDIR /app
 
-# Install system utilities needed for building packages or running healthchecks
+# Install system utilities and update CA certificates (mitigates eMudhra/emSign CA incident)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
     curl \
     build-essential \
+    && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+ENV UV_SYSTEM_CERTS=true
 
 # Copy the requirements file first to leverage Docker's caching mechanism
 COPY requirements.txt .
 
-# Install the Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Upgrade pip and certifi to patched versions before installing dependencies
+RUN pip install --no-cache-dir --upgrade "pip>=26.2.2" "certifi>=2026.10.19" && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Ensure .streamlit folder and secrets.toml exist so environment variables can load
 RUN mkdir -p .streamlit && touch .streamlit/secrets.toml

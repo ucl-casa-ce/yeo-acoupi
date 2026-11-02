@@ -33,5 +33,5 @@ jobs:
     
     - name: Build the Yeo-Acoupi Vis Docker image
       run: |
-         docker build --file ./Dockerfile --tag ghcr.io/ucl-casa-ce/yeo-acoupi-vis:latest .
+         docker build --pull --no-cache --file ./Dockerfile --tag ghcr.io/ucl-casa-ce/yeo-acoupi-vis:latest .
          docker push ghcr.io/ucl-casa-ce/yeo-acoupi-vis:latest
