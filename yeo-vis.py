@@ -614,6 +614,14 @@ if page not in ["Info + Map", "Recording Explorer"]:
         key="category_filter_key"
     )
 
+    # 5. Toggle to hide Spotted Crake (ID 238) false positives
+    hide_spotted_crake = st.sidebar.toggle(
+        "Hide Spotted Crake (ID 238)",
+        value=bool(st.session_state.get("hide_spotted_crake_key", True)),
+        key="hide_spotted_crake_key",
+        help="Exclude Spotted Crake (Porzana porzana, ID 238) suspected BirdNET false positives from dashboard metrics and charts."
+    )
+
     st.sidebar.divider()
 else:
     # Fallback default values for variables to avoid UnboundLocalError when skipping controls
@@ -623,6 +631,7 @@ else:
     selected_time_label = "Last 7 Days"
     confidence_threshold = 0.50
     category_filter = "All Species (Birds & Bats)"
+    hide_spotted_crake = True
 
 # --- HEARTBEAT & SYSTEM TELEMETRY QUERY ---
 @st.cache_data(ttl=60)
@@ -1050,6 +1059,14 @@ if has_raw_data:
         df = df[df["Category"] == "Bat"]
     elif category_filter == "All Species (Birds & Bats)":
         df = df[df["Category"].isin(["Bird", "Bat"])]
+
+    # Exclude Spotted Crake (ID 238 / Porzana porzana) when toggle is active
+    if hide_spotted_crake and not df.empty:
+        crake_mask = (
+            (df["Common_Name"].str.lower() == "spotted crake") |
+            (df["Scientific_Name"].str.lower() == "porzana porzana")
+        )
+        df = df[~crake_mask]
 
 # 7. Apply Confidence Threshold Filter
 high_conf_df = df[df["Confidence"] >= confidence_threshold] if not df.empty else pd.DataFrame()
