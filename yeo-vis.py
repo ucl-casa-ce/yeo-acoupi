@@ -756,7 +756,7 @@ if page not in ["Info + Map", "Recording Explorer"]:
                 else:
                     status_icon = "🔴"
                     status_text = "Offline"
-                time_str = last_seen.strftime("%H:%M:%S (%d %b)")
+                time_str = last_seen.strftime("%H:%M:%S (%a %d %b)")
             else:
                 status_icon = "🔴"
                 status_text = "Offline"
