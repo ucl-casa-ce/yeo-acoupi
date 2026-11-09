@@ -22,14 +22,16 @@ def natural_sort_key(s):
 # --- DEPLOYED DEVICES SPECIFICATION ---
 DEPLOYED_NAMES = {
     # Friendly names
-    "UNOQ-14-YV", "UNOQ-17-YV", "UNOQ-18-YV", "UNOQ-19-YV", "UNOQ-21-YV", "UNOQ-22-YV", "UNOQ-31-YV",
+    "UNOQ-14-YV", "UNOQ-17-YV", "UNOQ-18-YV", "UNOQ-19-YV", "UNOQ-20-YV", "UNOQ-21-YV", "UNOQ-22-YV", "UNOQ-29-YV", "UNOQ-30-YV", "UNOQ-31-YV",
     # Hostnames
-    "yeo-unoq-14", "yeo-unoq-17", "yeo-unoq-18", "yeo-unoq-19", "yeo-unoq-21", "yeo-unoq-22", "yeo-unoq-31",
-    "unoq-14-yv", "unoq-17-yv", "unoq-18-yv", "unoq-19-yv", "unoq-21-yv", "unoq-22-yv", "unoq-31-yv",
-    # Legacy names (UNOQ-31-YV was formerly UNOQ-12-YV)
+    "yeo-unoq-14", "yeo-unoq-17", "yeo-unoq-18", "yeo-unoq-19", "yeo-unoq-20", "yeo-unoq-21", "yeo-unoq-22", "yeo-unoq-29", "yeo-unoq-30", "yeo-unoq-31",
+    "unoq-14-yv", "unoq-17-yv", "unoq-18-yv", "unoq-19-yv", "unoq-20-yv", "unoq-21-yv", "unoq-22-yv", "unoq-29-yv", "unoq-30-yv", "unoq-31-yv",
+    # Legacy names (UNOQ-29-YV, UNOQ-30-YV, UNOQ-31-YV were formerly UNOQ-10-YV, UNOQ-11-YV, UNOQ-12-YV)
+    "UNOQ-10-YV", "yeo-unoq-10", "unoq-10-yv",
+    "UNOQ-11-YV", "yeo-unoq-11", "unoq-11-yv",
     "UNOQ-12-YV", "yeo-unoq-12", "unoq-12-yv",
     # Hardware MAC addresses
-    "14:b5:cd:e9:a9:c7", "14:b5:cd:ea:c5:4b", "14:b5:cd:ea:08:1b", "14:b5:cd:e9:65:17", "14:b5:cd:e8:b1:43", "14:b5:cd:e9:f5:eb", "14:b5:cd:ea:07:9f"
+    "14:b5:cd:e9:a9:c7", "14:b5:cd:ea:c5:4b", "14:b5:cd:ea:08:1b", "14:b5:cd:e9:65:17", "14:b5:cd:ea:22:55", "14:b5:cd:e8:b1:43", "14:b5:cd:e9:f5:eb", "14:b5:cd:ea:1e:6d", "14:b5:cd:ea:1d:a5", "14:b5:cd:ea:07:9f"
 }
 
 # --- DEVICE NAME OVERRIDES / ALIASES ---
@@ -52,6 +54,10 @@ DEVICE_NAME_OVERRIDES = {
     "yeo-unoq-19": "UNOQ-19-YV",
     "unoq-19-yv": "UNOQ-19-YV",
 
+    "14:b5:cd:ea:22:55": "UNOQ-20-YV",
+    "yeo-unoq-20": "UNOQ-20-YV",
+    "unoq-20-yv": "UNOQ-20-YV",
+
     "14:b5:cd:e8:b1:43": "UNOQ-21-YV",
     "yeo-unoq-21": "UNOQ-21-YV",
     "unoq-21-yv": "UNOQ-21-YV",
@@ -60,15 +66,6 @@ DEVICE_NAME_OVERRIDES = {
     "yeo-unoq-22": "UNOQ-22-YV",
     "unoq-22-yv": "UNOQ-22-YV",
 
-    "14:b5:cd:ea:07:9f": "UNOQ-31-YV",
-    "UNOQ-12-YV": "UNOQ-31-YV",
-    "yeo-unoq-12": "UNOQ-31-YV",
-    "unoq-12-yv": "UNOQ-31-YV",
-    "UNOQ-31-YV": "UNOQ-31-YV",
-    "yeo-unoq-31": "UNOQ-31-YV",
-    "unoq-31-yv": "UNOQ-31-YV",
-
-    # Reassigned Test Devices (formerly UNOQ-10-YV, UNOQ-11-YV)
     "14:b5:cd:ea:1e:6d": "UNOQ-29-YV",
     "UNOQ-10-YV": "UNOQ-29-YV",
     "yeo-unoq-10": "UNOQ-29-YV",
@@ -85,6 +82,14 @@ DEVICE_NAME_OVERRIDES = {
     "yeo-unoq-30": "UNOQ-30-YV",
     "unoq-30-yv": "UNOQ-30-YV",
 
+    "14:b5:cd:ea:07:9f": "UNOQ-31-YV",
+    "UNOQ-12-YV": "UNOQ-31-YV",
+    "yeo-unoq-12": "UNOQ-31-YV",
+    "unoq-12-yv": "UNOQ-31-YV",
+    "UNOQ-31-YV": "UNOQ-31-YV",
+    "yeo-unoq-31": "UNOQ-31-YV",
+    "unoq-31-yv": "UNOQ-31-YV",
+
     # Other Test / Lab Devices
     "14:b5:cd:ea:9c:27": "UNOQ-4-allotment-cellular",
     "14:b5:cd:ea:f9:f5": "UNOQ-2-allotment-wifi",
@@ -99,8 +104,11 @@ DEPLOYED_METADATA = {
     "14:b5:cd:ea:c5:4b": {"name": "UNOQ-17-YV", "latitude": 51.329258, "longitude": -2.701774, "version": "0.4.0"},
     "14:b5:cd:ea:08:1b": {"name": "UNOQ-18-YV", "latitude": 51.317586, "longitude": -2.696953, "version": "0.4.0"},
     "14:b5:cd:e9:65:17": {"name": "UNOQ-19-YV", "latitude": 51.3252009, "longitude": -2.699526, "version": "0.4.0"},
+    "14:b5:cd:ea:22:55": {"name": "UNOQ-20-YV", "latitude": 51.311828, "longitude": -2.6726, "version": "0.4.0"},
     "14:b5:cd:e8:b1:43": {"name": "UNOQ-21-YV", "latitude": 51.265968, "longitude": -2.699942, "version": "0.4.0"},
     "14:b5:cd:e9:f5:eb": {"name": "UNOQ-22-YV", "latitude": 51.306259, "longitude": -2.684633, "version": "0.2.0"},
+    "14:b5:cd:ea:1e:6d": {"name": "UNOQ-29-YV", "latitude": 51.305855, "longitude": -2.671789, "version": "0.4.0"},
+    "14:b5:cd:ea:1d:a5": {"name": "UNOQ-30-YV", "latitude": 51.310351, "longitude": -2.682779, "version": "0.4.0"},
     "14:b5:cd:ea:07:9f": {"name": "UNOQ-31-YV", "latitude": 51.330145, "longitude": -2.706942, "version": "0.4.0"},
 }
 
