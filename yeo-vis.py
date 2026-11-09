@@ -337,10 +337,32 @@ def resolve_species(val):
     }
 
 # --- DISCOVER KNOWN DEVICES & DEPLOYMENTS ---
+def _is_hardware_id(dev_id: str) -> bool:
+    """Returns True if dev_id looks like a hardware MAC address or LoRaWAN DevEUI."""
+    return bool(re.match(r"^[0-9a-fA-F]{2}([:\-][0-9a-fA-F]{2}){5,7}$", str(dev_id).strip()))
+
+# Map friendly names to their canonical hardware MAC / DevEUI
+FRIENDLY_TO_CANONICAL_ID = {}
+for _k, _fname in DEVICE_NAME_OVERRIDES.items():
+    if _is_hardware_id(_k):
+        FRIENDLY_TO_CANONICAL_ID[_fname] = _k
+for _k, _meta in DEPLOYED_METADATA.items():
+    if _meta.get("name"):
+        FRIENDLY_TO_CANONICAL_ID[_meta["name"]] = _k
+
+# Build alias -> canonical ID lookup from static overrides
+STATIC_ALIAS_TO_CANONICAL = {}
+for _alias, _fname in DEVICE_NAME_OVERRIDES.items():
+    _canon = FRIENDLY_TO_CANONICAL_ID.get(_fname, _alias)
+    STATIC_ALIAS_TO_CANONICAL[_alias] = _canon
+    STATIC_ALIAS_TO_CANONICAL[_alias.lower()] = _canon
+    STATIC_ALIAS_TO_CANONICAL[_fname] = _canon
+    STATIC_ALIAS_TO_CANONICAL[_fname.lower()] = _canon
+
 @st.cache_data(ttl=120)
 def fetch_device_deployments():
     """
-    Fetches the mapping of device_id to latest deployment details (name, lat, lon).
+    Fetches the mapping of canonical device_id to latest deployment details (name, lat, lon).
     Returns a dict: {device_id: {"name": name, "latitude": lat, "longitude": lon, "version": version}}
     """
     q = f'''
@@ -359,7 +381,8 @@ def fetch_device_deployments():
             if "_time" in res.columns:
                 res = res.sort_values("_time", ascending=False)
             for _, row in res.iterrows():
-                dev_id = str(row["device_id"]).strip()
+                raw_id = str(row["device_id"]).strip()
+                dev_id = STATIC_ALIAS_TO_CANONICAL.get(raw_id, STATIC_ALIAS_TO_CANONICAL.get(raw_id.lower(), raw_id))
                 if dev_id not in mapping:
                     mapping[dev_id] = {
                         "name": str(row.get("name", dev_id)).strip(),
@@ -370,26 +393,29 @@ def fetch_device_deployments():
     except Exception:
         pass
 
-    # Apply manual device name overrides / aliases and fallback metadata
+    # Apply manual device name overrides ONLY to canonical IDs (prevents duplicate alias entries)
     for dev_id, override_name in DEVICE_NAME_OVERRIDES.items():
-        if dev_id in mapping:
+        canon_id = STATIC_ALIAS_TO_CANONICAL.get(dev_id, dev_id)
+        if canon_id != dev_id:
+            continue
+        if canon_id in mapping:
             if override_name:
-                mapping[dev_id]["name"] = override_name
+                mapping[canon_id]["name"] = override_name
         else:
-            mapping[dev_id] = {
+            mapping[canon_id] = {
                 "name": override_name,
                 "latitude": None,
                 "longitude": None,
                 "version": None
             }
         # Fallback coordinates & version if missing from InfluxDB
-        if dev_id in DEPLOYED_METADATA:
-            if mapping[dev_id].get("latitude") is None:
-                mapping[dev_id]["latitude"] = DEPLOYED_METADATA[dev_id]["latitude"]
-            if mapping[dev_id].get("longitude") is None:
-                mapping[dev_id]["longitude"] = DEPLOYED_METADATA[dev_id]["longitude"]
-            if not mapping[dev_id].get("version"):
-                mapping[dev_id]["version"] = DEPLOYED_METADATA[dev_id]["version"]
+        if canon_id in DEPLOYED_METADATA:
+            if mapping[canon_id].get("latitude") is None:
+                mapping[canon_id]["latitude"] = DEPLOYED_METADATA[canon_id]["latitude"]
+            if mapping[canon_id].get("longitude") is None:
+                mapping[canon_id]["longitude"] = DEPLOYED_METADATA[canon_id]["longitude"]
+            if not mapping[canon_id].get("version"):
+                mapping[canon_id]["version"] = DEPLOYED_METADATA[canon_id]["version"]
 
     return mapping
 
@@ -452,14 +478,46 @@ def fetch_known_devices():
         return sorted(cleaned, key=natural_sort_key)
     return ["uno4-cellular", "unoq-2", "unoq-4-cellular", "unoq-bat"]
 
-known_devices = fetch_known_devices()
+raw_known_devices = fetch_known_devices()
 deployments = fetch_device_deployments()
 
-# Merge devices from deployment map
+# Build dynamic alias -> canonical ID lookup including deployment names from InfluxDB
+ALIAS_TO_CANONICAL = dict(STATIC_ALIAS_TO_CANONICAL)
+for _cid, _info in deployments.items():
+    ALIAS_TO_CANONICAL[_cid] = _cid
+    ALIAS_TO_CANONICAL[_cid.lower()] = _cid
+    _dname = _info.get("name", "")
+    if _dname:
+        ALIAS_TO_CANONICAL[_dname] = _cid
+        ALIAS_TO_CANONICAL[_dname.lower()] = _cid
+        # Also map standard hostname patterns (e.g. UNOQ-16-YV -> yeo-unoq-16, unoq-16-yv)
+        _m = re.match(r"^t?unoq-(\d+)-yv$", _dname.lower())
+        if _m:
+            _num = _m.group(1)
+            ALIAS_TO_CANONICAL[f"yeo-unoq-{_num}"] = _cid
+            ALIAS_TO_CANONICAL[f"unoq-{_num}-yv"] = _cid
+            ALIAS_TO_CANONICAL[f"UNOQ-{_num}-YV"] = _cid
+
+def normalize_device_id(dev_id: str) -> str:
+    """Resolves any device alias, hostname, or MAC to its single canonical device ID."""
+    if not dev_id:
+        return "unknown"
+    s = str(dev_id).strip()
+    if s in ALIAS_TO_CANONICAL:
+        return ALIAS_TO_CANONICAL[s]
+    if s.lower() in ALIAS_TO_CANONICAL:
+        return ALIAS_TO_CANONICAL[s.lower()]
+    return s
+
+# Merge and deduplicate known devices to canonical IDs only
+known_devices_set = set()
+for d in raw_known_devices:
+    if d.lower() not in ("nan", "none", "null", "unknown", ""):
+        known_devices_set.add(normalize_device_id(d))
 for d in deployments.keys():
-    if d not in known_devices and d.lower() not in ("nan", "none", "null", "unknown", ""):
-        known_devices.append(d)
-known_devices = sorted(list(set(known_devices)), key=natural_sort_key)
+    if d.lower() not in ("nan", "none", "null", "unknown", ""):
+        known_devices_set.add(normalize_device_id(d))
+known_devices = sorted(list(known_devices_set), key=natural_sort_key)
 
 # --- SIDEBAR NAVIGATION ---
 st.sidebar.markdown("## Devices")
@@ -583,9 +641,29 @@ def fetch_heartbeat_data(time_val="-7d"):
     except Exception:
         return pd.DataFrame()
 
+@st.cache_data(ttl=60)
+def fetch_latest_heartbeat_times():
+    """Fetches the most recent heartbeat timestamp (-90d) for every device so offline nodes remain visible."""
+    q = f'''
+    from(bucket: "{BUCKET}")
+      |> range(start: -90d)
+      |> filter(fn: (r) => r["_measurement"] == "acoupi_heartbeat")
+      |> last()
+      |> keep(columns: ["_time", "device_id", "topic"])
+    '''
+    try:
+        res = query_api.query_data_frame(q)
+        if isinstance(res, list):
+            res = pd.concat(res, ignore_index=True) if len(res) > 0 else pd.DataFrame()
+        return res
+    except Exception:
+        return pd.DataFrame()
+
 hb_df = pd.DataFrame()
+latest_hb_all_df = pd.DataFrame()
 if page not in ["Info + Map", "Recording Explorer"]:
     hb_df = fetch_heartbeat_data(selected_time_val)
+    latest_hb_all_df = fetch_latest_heartbeat_times()
 
 # Process Heartbeat Data
 active_devices_count = 0
@@ -593,83 +671,112 @@ active_devices_count = 0
 def resolve_device_id(row):
     dev = row.get("device_id")
     if pd.notna(dev) and str(dev).strip() and str(dev).strip().lower() not in ("nan", "none", "null", "unknown"):
-        return str(dev).strip()
+        return normalize_device_id(str(dev).strip())
     topic = row.get("topic")
     if pd.notna(topic) and isinstance(topic, str):
         parts = topic.split("/")
         if len(parts) >= 3 and parts[0] == "yeo" and parts[1] == "acoupi":
-            return parts[2]
+            return normalize_device_id(parts[2])
         if len(parts) >= 2 and parts[0] == "yeo":
-            return parts[1]
+            return normalize_device_id(parts[1])
     return "unknown"
 
-if page not in ["Info + Map", "Recording Explorer"] and not hb_df.empty:
-    hb_df["Device"] = hb_df.apply(resolve_device_id, axis=1)
-    hb_df = hb_df[hb_df["Device"].isin(active_devices)]
-    
+if page not in ["Info + Map", "Recording Explorer"]:
     if not hb_df.empty:
-        # Ensure standard telemetry fields exist
-        for col in ["shm", "mem_free", "cpu", "mem_used"]:
-            if col not in hb_df.columns:
-                hb_df[col] = np.nan
-
-        # Scale/fill compact telemetry fields if present
-        if "s" in hb_df.columns:
-            hb_df["shm"] = hb_df["shm"].fillna(hb_df["s"] / (1024 * 1024))
-        if "m" in hb_df.columns:
-            hb_df["mem_free"] = hb_df["mem_free"].fillna(hb_df["m"] / (1024 * 1024))
-        if "q" in hb_df.columns:
-            hb_df["cpu"] = hb_df["cpu"].fillna(hb_df["q"])
-        if "t" in hb_df.columns:
-            hb_df["mem_used"] = hb_df["mem_used"].fillna(hb_df["t"])
+        hb_df["Device"] = hb_df.apply(resolve_device_id, axis=1)
+        hb_df = hb_df[hb_df["Device"].isin(active_devices)]
         
-        if "_time" in hb_df.columns:
-            hb_df["_time"] = pd.to_datetime(hb_df["_time"], utc=True)
-            now_utc = pd.Timestamp.now(tz="UTC")
+        if not hb_df.empty:
+            # Ensure standard telemetry fields exist
+            for col in ["shm", "mem_free", "cpu", "mem_used"]:
+                if col not in hb_df.columns:
+                    hb_df[col] = np.nan
+
+            # Scale/fill compact telemetry fields if present
+            if "s" in hb_df.columns:
+                hb_df["shm"] = hb_df["shm"].fillna(hb_df["s"] / (1024 * 1024))
+            if "m" in hb_df.columns:
+                hb_df["mem_free"] = hb_df["mem_free"].fillna(hb_df["m"] / (1024 * 1024))
+            if "q" in hb_df.columns:
+                hb_df["cpu"] = hb_df["cpu"].fillna(hb_df["q"])
+            if "t" in hb_df.columns:
+                hb_df["mem_used"] = hb_df["mem_used"].fillna(hb_df["t"])
+            
+            if "_time" in hb_df.columns:
+                hb_df["_time"] = pd.to_datetime(hb_df["_time"], utc=True)
+
+    # Helper to get friendly name for sorting and display
+    def get_friendly_name(dev_id):
+        if dev_id in deployments and deployments[dev_id].get("name"):
+            return deployments[dev_id]["name"]
+        return dev_id
+
+    # Build combined last-seen table across the selected window and 90-day history
+    hb_time_frames = []
+    if not hb_df.empty and "_time" in hb_df.columns and "Device" in hb_df.columns:
+        hb_time_frames.append(hb_df[["_time", "Device"]].dropna())
+    if not latest_hb_all_df.empty and "_time" in latest_hb_all_df.columns:
+        l_df = latest_hb_all_df.copy()
+        l_df["Device"] = l_df.apply(resolve_device_id, axis=1)
+        l_df = l_df[l_df["Device"].isin(active_devices)]
+        if not l_df.empty:
+            l_df["_time"] = pd.to_datetime(l_df["_time"], utc=True)
+            hb_time_frames.append(l_df[["_time", "Device"]].dropna())
+
+    now_utc = pd.Timestamp.now(tz="UTC")
+    st.sidebar.markdown("### Device Status")
+
+    last_seen_by_friendly = {}
+    if hb_time_frames:
+        combined_hb_times = pd.concat(hb_time_frames, ignore_index=True)
+        combined_hb_times["Friendly"] = combined_hb_times["Device"].apply(get_friendly_name)
+        latest_per_dev = combined_hb_times.sort_values("_time", ascending=False).groupby("Friendly").first().reset_index()
+        for _, r in latest_per_dev.iterrows():
+            last_seen_by_friendly[r["Friendly"]] = r["_time"]
+
+    # Ensure all officially deployed devices are always listed on the Deployed Devices view
+    if page == "Deployed Devices":
+        for meta in DEPLOYED_METADATA.values():
+            fname = meta.get("name")
+            if fname and fname not in last_seen_by_friendly:
+                last_seen_by_friendly[fname] = None
+
+    if last_seen_by_friendly:
+        sorted_fnames = sorted(last_seen_by_friendly.keys(), key=natural_sort_key)
+        for friendly_name in sorted_fnames:
+            last_seen = last_seen_by_friendly[friendly_name]
+            if last_seen is not None and pd.notna(last_seen):
+                diff_hours = (now_utc - last_seen).total_seconds() / 3600.0
+                if diff_hours <= 2:
+                    status_icon = "🟢"
+                    status_text = "Online"
+                elif diff_hours <= 12:
+                    status_icon = "🟡"
+                    status_text = "Stale"
+                else:
+                    status_icon = "🔴"
+                    status_text = "Offline"
+                time_str = last_seen.strftime("%H:%M:%S (%d %b)")
+            else:
+                status_icon = "🔴"
+                status_text = "Offline"
+                time_str = "No heartbeat recorded"
+
+            st.sidebar.markdown(
+                f"**{status_icon} `{friendly_name}`**: {status_text}  \n<small>Last: {time_str}</small>",
+                unsafe_allow_html=True
+            )
+            active_devices_count += 1
+
+        if not hb_df.empty and "_time" in hb_df.columns:
             hb_24h = hb_df[hb_df["_time"] >= (now_utc - pd.Timedelta(hours=24))]
-            
-            st.sidebar.markdown("### Device Status (24h)")
-            
-            # Helper to get friendly name for sorting and display
-            def get_friendly_name(dev_id):
-                if dev_id in deployments and deployments[dev_id].get("name"):
-                    return deployments[dev_id]["name"]
-                return dev_id
-
             if not hb_24h.empty:
-                latest_hb = hb_24h.sort_values("_time", ascending=False).groupby("Device").first().reset_index()
-                hb_rows = latest_hb.to_dict("records")
-                hb_rows.sort(key=lambda r: natural_sort_key(get_friendly_name(r.get("Device", ""))))
-
-                for dev_row in hb_rows:
-                    dev_id = dev_row["Device"]
-                    friendly_name = get_friendly_name(dev_id)
-                    last_seen = dev_row["_time"]
-                    diff_hours = (now_utc - last_seen).total_seconds() / 3600.0
-                    
-                    if diff_hours <= 2:
-                        status_icon = "🟢"
-                        status_text = "Online"
-                    elif diff_hours <= 12:
-                        status_icon = "🟡"
-                        status_text = "Stale"
-                    else:
-                        status_icon = "🔴"
-                        status_text = "Offline"
-                        
-                    time_str = last_seen.strftime("%H:%M:%S (%d %b)")
-                    st.sidebar.markdown(f"**{status_icon} `{friendly_name}`**: {status_text}  \n<small>Last: {time_str}</small>", unsafe_allow_html=True)
-                    active_devices_count += 1
-                    
                 spark_df = hb_24h.set_index("_time").resample("1h").size().reset_index(name="Pulses")
-                st.sidebar.markdown("**Heartbeats / Hour**")
+                st.sidebar.markdown("**Heartbeats / Hour (24h)**")
                 st.sidebar.line_chart(spark_df, x="_time", y="Pulses", height=130)
             else:
-                st.sidebar.info("No heartbeat data in the last 24h")
+                st.sidebar.info("No heartbeat pulses in the last 24h")
     else:
-        st.sidebar.warning("No heartbeat data in the selected period")
-else:
-    if page not in ["Info + Map", "Recording Explorer"]:
         st.sidebar.warning("No heartbeat data in the selected period")
 
 # --- DETECTIONS QUERY ---
