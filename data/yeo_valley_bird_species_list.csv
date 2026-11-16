@@ -220,7 +220,7 @@ species_id,class_name,common_name,species,exclude_vis,exclude_messages
 235,Podiceps nigricollis_Eared Grebe,Black-necked Grebe,Podiceps nigricollis,False,False
 236,Poecile montanus_Willow Tit,Willow Tit,Poecile montanus,False,False
 237,Poecile palustris_Marsh Tit,Marsh Tit,Poecile palustris,False,False
-238,Porzana porzana_Spotted Crake,Spotted Crake,Porzana porzana,False,False
+238,Porzana porzana_Spotted Crake,Spotted Crake,Porzana porzana,True,False
 239,Power tools_Power tools,Power tools,Power tools,True,True
 240,Prunella modularis_Dunnock,Dunnock,Prunella modularis,False,False
 241,Psittacula krameri_Rose-ringed Parakeet,Ring-necked Parakeet,Psittacula krameri,False,False
@@ -281,3 +281,12 @@ species_id,class_name,common_name,species,exclude_vis,exclude_messages
 296,Uria aalge_Common Murre,Common Guillemot,Uria aalge,True,False
 297,Vanellus vanellus_Northern Lapwing,Lapwing,Vanellus vanellus,False,False
 298,Xema sabini_Sabine's Gull,Sabine's Gull,Xema sabini,False,False
+299,Acanthis cabaret_Lesser Redpoll,Lesser Redpoll,Acanthis flammea,False,False
+300,Accipiter gentilis_Northern Goshawk,Northern Goshawk,Astur gentilis,False,False
+301,Bubulcus ibis_Cattle Egret,Cattle Egret,Ardea ibis,False,False
+302,Charadrius alexandrinus_Kentish Plover,Kentish Plover,Anarhynchus alexandrinus,False,False
+303,Charadrius dubius_Little Ringed Plover,Little Ringed Plover,Thinornis dubius,False,False
+304,Corvus monedula_Eurasian Jackdaw,Eurasian Jackdaw,Coloeus monedula,False,False
+305,Emberiza schoeniclus_Reed Bunting,Reed Bunting,Schoeniclus schoeniclus,False,False
+306,Ixobrychus minutus_Little Bittern,Little Bittern,Botaurus minutus,False,False
+307,Troglodytes troglodytes_Eurasian Wren,Eurasian Wren,Nannus troglodytes,False,False
