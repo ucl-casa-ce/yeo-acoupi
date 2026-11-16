@@ -1,6 +1,6 @@
 # 🌿 Yeo Valley Bioacoustic Data Visualisation (`yeo-acoupi`)
 
-**An interactive bioacoustic monitoring, telemetry, and audio/spectrogram visualisation platform developed by the Connected Environments Lab at UCL CASA in collaboration with Yeo Valley.**
+**An interactive bioacoustic monitoring, telemetry, and audio/spectrogram visualisation platform developed by the Connected Environments Lab at UCL CASA in collaboration with UCL CBER and Yeo Valley.**
 
 This repository houses the **cloud ingestion configurations and interactive web visualisation suite** (`yeo-vis`) used to explore real-time biodiversity detections (birds & bats), edge node hardware health, and ultrasonic/acoustic field recordings captured across the Yeo Valley estate.
 
@@ -10,16 +10,15 @@ This repository houses the **cloud ingestion configurations and interactive web 
 
 ---
 
-## 🎯 Purpose of This Guide
+## Purpose of This Guide
 
-This `README` introduces **makers, ecologists, and developers** to everything covered in this visualisation repository:
-1. **Visualisation Showcase**: A complete tour of every web page, chart, map, and interactive audio/spectrogram tool created for the Yeo Valley deployment (with presentation-ready screenshots stored in [`assets/`](assets/)).
-2. **Data Pipeline & Correlation Architecture**: How compact live telemetry in **InfluxDB v2** and high-resolution audio/spectrogram media in **Silo / MinIO S3** are dynamically correlated and rendered in the browser.
+1. **Visualisation Showcase**: An overview of pages, charts, maps, and the interactive audio/spectrogram tool created for the Yeo Valley deployment (screenshots in [`assets/`](assets/)).
+2. **Data Pipeline & Architecture**: How compact live telemetry in **InfluxDB v2** and high-resolution audio/spectrogram media in **Silo / MinIO S3** are dynamically rendered in the browser.
 3. **Repository Tour & Operations**: How the codebase is structured, how to run the dashboard locally, and how updates are deployed via GitHub Actions and Portainer.
 
 ---
 
-## 🏗️ Data & Visualisation Architecture
+## Data & Visualisation Architecture
 
 Capturing continuous 192 kHz 16-bit uncompressed ultrasonic audio in the field generates **~1.4 GB per hour (~33 GB/day per node)**. Because streaming raw audio over 4G cellular or LoRaWAN would rapidly drain solar batteries and SIM data budgets, the platform uses a **decoupled two-tier data architecture** that the visualisation app brings back together:
 
@@ -31,7 +30,7 @@ Capturing continuous 192 kHz 16-bit uncompressed ultrasonic audio in the field g
   │      ▼
   │    [ MQTT Broker (mqtt.cetools.org) ] ──► [ Telegraf (sample-telegraf.conf) ] ──► [ InfluxDB v2 (CE_yeo) ]
   │
-  └──► Tier 2: Full Audio (.wav) & Spectrograms (.png) (SD Spool / High-Bandwidth Sync)
+  └──► Tier 2: Full Audio (.wav, manually downloaded from devices via USB) & Spectrograms (.png)
          │  3-second acoustic & 192 kHz ultrasonic clips + pre-rendered spectrograms
          ▼
        [ Silo / MinIO S3 Bucket (buckets.cetools.org/yeo) ]
@@ -43,7 +42,7 @@ Capturing continuous 192 kHz 16-bit uncompressed ultrasonic audio in the field g
 
 ---
 
-## 🖼️ Visualisation Tour: Web Pages & Interactive Views
+## Visualisation Tour: Web Pages & Interactive Views
 
 All screenshots below are stored at high resolution ($3200 \times 2000$ Retina) in the [`assets/`](assets/) directory for direct use in PowerPoint presentations and reports.
 
@@ -149,22 +148,6 @@ Provides visitors and stakeholders with an overview of the Yeo Valley monitoring
 
 ---
 
-### 7. Exploratory Design Prototype: "Fieldsong" Interactive Biodiversity Map
-**Captured in:** [`assets/15-biodiversity-map-prototype.png`](assets/15-biodiversity-map-prototype.png) – [`assets/17-biodiversity-map-light-theme.png`](assets/17-biodiversity-map-light-theme.png) *(archived HTML prototype in [`archive/handover/6-visualisation/biodiversity-map.html`](archive/handover/6-visualisation/biodiversity-map.html))*
-
-During development, a standalone zero-dependency HTML/CSS/SVG/JS design prototype (**Fieldsong · Willowmere Farm Biodiversity**) was also created to explore next-generation visual storytelling concepts for farm-scale acoustic monitoring:
-* **Multi-Lens Spatial Markers**: Colour and size habitat markers dynamically by **Species Richness**, **Native Ratio**, **Notable Species**, or **Sensor Health** across `24h`, `7 days`, `30 days`, or `Season` windows.
-* **Farm Overview & Live Activity Stream**: Summarises total species heard, native share, richest/busiest habitats, weekly diversity trends, and a real-time streaming ticker.
-* **Interactive Habitat Drill-Down Drawer**: Clicking any sensor marker on the map opens a detailed drawer showing habitat-specific species composition bars (distinguishing birds, bats, and non-native species), 7-day activity trends, and 24-hour diurnal rhythm curves in both Dark and Light cartographic themes.
-
-![Fieldsong Biodiversity Map Prototype — Overview](assets/15-biodiversity-map-prototype.png)
-
-![Fieldsong Biodiversity Map Prototype — Sensor Detail Drawer](assets/16-biodiversity-map-sensor-detail.png)
-
-![Fieldsong Biodiversity Map Prototype — Light Theme](assets/17-biodiversity-map-light-theme.png)
-
----
-
 ## 📂 Repository Structure
 
 Newcomers only need to focus on the root Python application files, `data/`, and `assets/`. Everything inside `archive/` is legacy hardware/handover documentation that now lives in **[`djdunc/acoupi-yeo-valley`](https://github.com/djdunc/acoupi-yeo-valley)** and **can be ignored**.
@@ -245,10 +228,3 @@ Open **`http://localhost:8501`** in your browser.
 ### 4. Production Deployment
 See [`how-to-update.md`](how-to-update.md) for the complete GitHub Actions (`ghcr.io/ucl-casa-ce/yeo-acoupi-vis:latest`) and **Portainer** deployment workflow.
 
----
-
-## 📬 Credits & Contact
-
-Developed by the **Connected Environments Lab** at the **Centre for Advanced Spatial Analysis (CASA), University College London (UCL)** in collaboration with **Yeo Valley**.
-
-* **Contact**: Prof. Duncan Wilson (`d.j.wilson@ucl.ac.uk`)
